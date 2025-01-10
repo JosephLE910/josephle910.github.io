@@ -1,7 +1,7 @@
 ---
-title: Design Draft
-author: Tao He
-date: 2022-02-06
+title: About
+author: Jo
+date: 2025-01-03
 category: Jekyll
 layout: post
 ---
