@@ -5,8 +5,6 @@ permalink: /
 ---
 ![](/assets/img/dark-souls.gif)
 
-{::nomarkdown}
-<div style="font-family: 'Times New Roman'; text-align: center; font-weight: bold;background-color: #f5f7fa; padding: 10px; border-left: 4px solid #d0d7de;">May You find your worth in the waking world.</div>
-{:/}
+> **May You find your worth in the waking world.**
 
 # 游戏开发
