@@ -14,3 +14,7 @@ permalink: /
 在浏览器中直接游玩 OutLaw。
 
 # 游戏开发
+
+## <a href="https://github.com/JosephLE910/ai-gamedev-workflow" target="_blank" rel="noopener">🤖 AI 游戏开发协作蓝图</a>
+
+多智能体协作体系：规划者 + 执行者 + 人，可移植部署。
