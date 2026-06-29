@@ -1,0 +1,1742 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>下班后 - AfterWork</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: #1a1a2e;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 100vh;
+    font-family: 'Courier New', monospace;
+    overflow: hidden;
+    touch-action: none;
+  }
+  #gameContainer {
+    position: relative;
+    width: 640px;
+    height: 360px;
+  }
+  #gameCanvas {
+    width: 640px;
+    height: 360px;
+    image-rendering: pixelated;
+    image-rendering: -moz-crisp-edges;
+    image-rendering: crisp-edges;
+    background: #000;
+  }
+  #touchControls {
+    display: none;
+    position: absolute;
+    bottom: 10px;
+    left: 10px;
+    right: 10px;
+    justify-content: space-between;
+    pointer-events: none;
+  }
+  .touch-btn {
+    width: 50px;
+    height: 50px;
+    background: rgba(255,255,255,0.3);
+    border: 2px solid rgba(255,255,255,0.5);
+    border-radius: 8px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    font-size: 24px;
+    color: rgba(255,255,255,0.8);
+    pointer-events: auto;
+    user-select: none;
+    -webkit-user-select: none;
+  }
+  .touch-btn:active { background: rgba(255,255,255,0.5); }
+  #dpad {
+    display: grid;
+    grid-template-columns: 50px 50px 50px;
+    grid-template-rows: 50px 50px 50px;
+    gap: 5px;
+  }
+  #dpad .up { grid-column: 2; grid-row: 1; }
+  #dpad .left { grid-column: 1; grid-row: 2; }
+  #dpad .right { grid-column: 3; grid-row: 2; }
+  #dpad .down { grid-column: 2; grid-row: 3; }
+  #actionBtn {
+    width: 70px;
+    height: 70px;
+    border-radius: 50%;
+    font-size: 16px;
+    align-self: center;
+  }
+  @media (max-width: 700px) {
+    #gameContainer { width: 100vw; height: calc(100vw * 9 / 16); }
+    #gameCanvas { width: 100%; height: 100%; }
+    #touchControls { display: flex; }
+  }
+  @media (hover: none) and (pointer: coarse) {
+    #touchControls { display: flex; }
+  }
+</style>
+</head>
+<body>
+<div id="gameContainer">
+  <canvas id="gameCanvas" width="320" height="180"></canvas>
+  <div id="touchControls">
+    <div id="dpad">
+      <div class="touch-btn up" data-key="ArrowUp">↑</div>
+      <div class="touch-btn left" data-key="ArrowLeft">←</div>
+      <div class="touch-btn right" data-key="ArrowRight">→</div>
+      <div class="touch-btn down" data-key="ArrowDown">↓</div>
+    </div>
+    <div class="touch-btn" id="actionBtn" data-key=" ">互动</div>
+  </div>
+</div>
+
+<script>
+// ==================== 游戏核心 ====================
+const canvas = document.getElementById('gameCanvas');
+const ctx = canvas.getContext('2d');
+ctx.imageSmoothingEnabled = false;
+
+// 颜色调色板（像素风）
+const COLORS = {
+  black: '#000000',
+  darkBlue: '#1a1a2e',
+  navy: '#16213e',
+  darkPurple: '#0f3460',
+  orange: '#e94560',
+  yellow: '#f5a623',
+  green: '#4ecdc4',
+  lightGreen: '#95e1d3',
+  brown: '#8b4513',
+  darkBrown: '#5d2906',
+  wood: '#a0522d',
+  lightWood: '#cd853f',
+  skin: '#ffdab9',
+  white: '#ffffff',
+  gray: '#808080',
+  lightGray: '#c0c0c0',
+  red: '#ff4444',
+  pink: '#ffb6c1',
+  blue: '#4169e1',
+  skyBlue: '#87ceeb',
+  nightSky: '#0c1445',
+  star: '#ffff99',
+  wallColor: '#3d3d5c',
+  floorColor: '#4a4a4a',
+  carpet: '#8b0000'
+};
+
+// ==================== 音频系统 ====================
+const AudioSystem = {
+  ctx: null,
+  enabled: true,
+  musicPlaying: false,
+  musicOsc: null,
+  musicGain: null,
+
+  init() {
+    try {
+      this.ctx = new (window.AudioContext || window.webkitAudioContext)();
+    } catch(e) {
+      this.enabled = false;
+    }
+  },
+
+  resume() {
+    if (this.ctx && this.ctx.state === 'suspended') {
+      this.ctx.resume();
+    }
+  },
+
+  // 播放简单音调
+  playTone(freq, duration = 0.1, type = 'square', volume = 0.1) {
+    if (!this.enabled || !this.ctx) return;
+    const osc = this.ctx.createOscillator();
+    const gain = this.ctx.createGain();
+    osc.type = type;
+    osc.frequency.value = freq;
+    gain.gain.value = volume;
+    gain.gain.exponentialRampToValueAtTime(0.001, this.ctx.currentTime + duration);
+    osc.connect(gain);
+    gain.connect(this.ctx.destination);
+    osc.start();
+    osc.stop(this.ctx.currentTime + duration);
+  },
+
+  // 脚步声
+  playFootstep() {
+    this.playTone(80 + Math.random() * 40, 0.05, 'square', 0.03);
+  },
+
+  // 交互音
+  playInteract() {
+    this.playTone(440, 0.1, 'sine', 0.1);
+    setTimeout(() => this.playTone(660, 0.1, 'sine', 0.1), 50);
+  },
+
+  // 场景切换音
+  playTransition() {
+    this.playTone(330, 0.15, 'sine', 0.1);
+    setTimeout(() => this.playTone(440, 0.15, 'sine', 0.1), 100);
+    setTimeout(() => this.playTone(550, 0.15, 'sine', 0.1), 200);
+  },
+
+  // 唱片音乐（Lo-Fi 简单旋律）
+  startMusic() {
+    if (!this.enabled || !this.ctx || this.musicPlaying) return;
+    this.musicPlaying = true;
+    this.playMusicLoop();
+  },
+
+  stopMusic() {
+    this.musicPlaying = false;
+  },
+
+  playMusicLoop() {
+    if (!this.musicPlaying) return;
+    const notes = [262, 294, 330, 349, 392, 349, 330, 294]; // C D E F E D
+    const now = this.ctx.currentTime;
+    notes.forEach((freq, i) => {
+      const osc = this.ctx.createOscillator();
+      const gain = this.ctx.createGain();
+      osc.type = 'sine';
+      osc.frequency.value = freq;
+      gain.gain.value = 0.05;
+      gain.gain.exponentialRampToValueAtTime(0.001, now + i * 0.3 + 0.25);
+      osc.connect(gain);
+      gain.connect(this.ctx.destination);
+      osc.start(now + i * 0.3);
+      osc.stop(now + i * 0.3 + 0.3);
+    });
+    setTimeout(() => this.playMusicLoop(), notes.length * 300);
+  },
+
+  // 环境音（蟋蟀/夜晚）
+  playAmbient() {
+    if (!this.enabled || !this.ctx) return;
+    const playCricket = () => {
+      if (SceneManager.currentScene === 'balcony' || SceneManager.currentScene === 'yard') {
+        this.playTone(4000 + Math.random() * 2000, 0.05, 'sine', 0.02);
+        setTimeout(playCricket, 2000 + Math.random() * 3000);
+      } else {
+        setTimeout(playCricket, 5000);
+      }
+    };
+    playCricket();
+  }
+};
+
+// ==================== 输入系统 ====================
+const Input = {
+  keys: {},
+  justPressed: {},
+  touchActive: {},
+
+  init() {
+    document.addEventListener('keydown', (e) => {
+      if (!this.keys[e.key]) {
+        this.justPressed[e.key] = true;
+      }
+      this.keys[e.key] = true;
+      AudioSystem.resume();
+    });
+
+    document.addEventListener('keyup', (e) => {
+      this.keys[e.key] = false;
+    });
+
+    // 触屏控制
+    document.querySelectorAll('.touch-btn').forEach(btn => {
+      const key = btn.dataset.key;
+      btn.addEventListener('touchstart', (e) => {
+        e.preventDefault();
+        if (!this.keys[key]) {
+          this.justPressed[key] = true;
+        }
+        this.keys[key] = true;
+        this.touchActive[key] = true;
+        AudioSystem.resume();
+      });
+      btn.addEventListener('touchend', (e) => {
+        e.preventDefault();
+        this.keys[key] = false;
+        this.touchActive[key] = false;
+      });
+    });
+
+    // 点击互动
+    canvas.addEventListener('click', (e) => {
+      const rect = canvas.getBoundingClientRect();
+      const scaleX = 320 / rect.width;
+      const scaleY = 180 / rect.height;
+      const x = (e.clientX - rect.left) * scaleX;
+      const y = (e.clientY - rect.top) * scaleY;
+      Input.clickX = x;
+      Input.clickY = y;
+      Input.clicked = true;
+      AudioSystem.resume();
+    });
+  },
+
+  isDown(key) {
+    return this.keys[key] || false;
+  },
+
+  wasPressed(key) {
+    return this.justPressed[key] || false;
+  },
+
+  clearFrame() {
+    this.justPressed = {};
+    this.clicked = false;
+  },
+
+  getMovement() {
+    let dx = 0, dy = 0;
+    if (this.isDown('ArrowLeft') || this.isDown('a') || this.isDown('A')) dx -= 1;
+    if (this.isDown('ArrowRight') || this.isDown('d') || this.isDown('D')) dx += 1;
+    if (this.isDown('ArrowUp') || this.isDown('w') || this.isDown('W')) dy -= 1;
+    if (this.isDown('ArrowDown') || this.isDown('s') || this.isDown('S')) dy += 1;
+    return { dx, dy };
+  },
+
+  getActionPressed() {
+    return this.wasPressed(' ') || this.wasPressed('Enter') || this.wasPressed('e') || this.wasPressed('E');
+  }
+};
+
+// ==================== 存档系统 ====================
+const SaveSystem = {
+  save(data) {
+    try {
+      localStorage.setItem('afterwork_save', JSON.stringify(data));
+    } catch(e) {}
+  },
+
+  load() {
+    try {
+      const data = localStorage.getItem('afterwork_save');
+      return data ? JSON.parse(data) : null;
+    } catch(e) {
+      return null;
+    }
+  }
+};
+
+// ==================== 玩家 ====================
+const Player = {
+  x: 160,
+  y: 120,
+  width: 12,
+  height: 16,
+  speed: 1.5,
+  direction: 'down', // up, down, left, right
+  animFrame: 0,
+  animTimer: 0,
+  isMoving: false,
+  stepTimer: 0,
+
+  reset(x, y) {
+    this.x = x;
+    this.y = y;
+    this.direction = 'down';
+  },
+
+  update() {
+    const move = Input.getMovement();
+    this.isMoving = move.dx !== 0 || move.dy !== 0;
+
+    // 每 30 帧记录一次玩家状态
+    if (!this._frameCounter) this._frameCounter = 0;
+    this._frameCounter++;
+    if (this._frameCounter % 30 === 0) {
+      DebugLog.add('POS', `P(${Math.floor(this.x)},${Math.floor(this.y)}) input(${move.dx},${move.dy}) scene=${SceneManager.currentScene} transitioning=${SceneManager.transitioning} dialogue=${DialogueSystem.active} minigame=${MiniGame.active}`);
+    }
+
+    if (this.isMoving && !DialogueSystem.active && !MiniGame.active) {
+      // 更新朝向
+      if (move.dx < 0) this.direction = 'left';
+      else if (move.dx > 0) this.direction = 'right';
+      else if (move.dy < 0) this.direction = 'up';
+      else if (move.dy > 0) this.direction = 'down';
+
+      // 移动
+      const newX = this.x + move.dx * this.speed;
+      const newY = this.y + move.dy * this.speed;
+
+      // 碰撞检测
+      const hitX = this.checkCollision(newX, this.y);
+      const hitY = this.checkCollision(this.x, newY);
+      if (!hitX) { this.x = newX; }
+      if (!hitY) { this.y = newY; }
+
+      DebugLog.add('MV', `(${Math.floor(this.x)},${Math.floor(this.y)}) dir=${this.direction} colX=${hitX} colY=${hitY}`);
+
+      // 边界限制
+      this.x = Math.max(8, Math.min(312 - this.width, this.x));
+      this.y = Math.max(8, Math.min(172 - this.height, this.y));
+
+      // 动画
+      this.animTimer++;
+      if (this.animTimer > 8) {
+        this.animTimer = 0;
+        this.animFrame = (this.animFrame + 1) % 4;
+      }
+
+      // 脚步声
+      this.stepTimer++;
+      if (this.stepTimer > 15) {
+        this.stepTimer = 0;
+        AudioSystem.playFootstep();
+      }
+    } else {
+      this.animFrame = 0;
+      this.stepTimer = 0;
+      if (move.dx !== 0 || move.dy !== 0) {
+        DebugLog.add('STUCK', `input(${move.dx},${move.dy}) but blocked by dialogue/minigame/transition`);
+      }
+    }
+  },
+
+  checkCollision(x, y) {
+    const scene = SceneManager.getCurrentScene();
+    if (!scene || !scene.colliders) return false;
+    for (const col of scene.colliders) {
+      if (x < col.x + col.w && x + this.width > col.x &&
+          y < col.y + col.h && y + this.height > col.y) {
+        DebugLog.add('COL', `hit(${col.x},${col.y},${col.w}x${col.h}) at P(${Math.floor(x)},${Math.floor(y)})`);
+        return true;
+      }
+    }
+    return false;
+  },
+
+  draw() {
+    const x = Math.floor(this.x);
+    const y = Math.floor(this.y);
+
+    // 身体
+    ctx.fillStyle = COLORS.blue;
+    ctx.fillRect(x + 2, y + 6, 8, 8);
+
+    // 头
+    ctx.fillStyle = COLORS.skin;
+    ctx.fillRect(x + 3, y, 6, 6);
+
+    // 头发
+    ctx.fillStyle = COLORS.darkBrown;
+    ctx.fillRect(x + 3, y, 6, 2);
+
+    // 眼睛
+    ctx.fillStyle = COLORS.black;
+    if (this.direction === 'down') {
+      ctx.fillRect(x + 4, y + 3, 1, 1);
+      ctx.fillRect(x + 7, y + 3, 1, 1);
+    } else if (this.direction === 'up') {
+      // 背面看不到眼睛
+    } else if (this.direction === 'left') {
+      ctx.fillRect(x + 4, y + 3, 1, 1);
+    } else {
+      ctx.fillRect(x + 7, y + 3, 1, 1);
+    }
+
+    // 腿（动画）
+    ctx.fillStyle = COLORS.darkBlue;
+    if (this.isMoving) {
+      const legOffset = this.animFrame % 2 === 0 ? 0 : 1;
+      ctx.fillRect(x + 3, y + 14, 2, 2 + legOffset);
+      ctx.fillRect(x + 7, y + 14, 2, 2 + (1 - legOffset));
+    } else {
+      ctx.fillRect(x + 3, y + 14, 2, 2);
+      ctx.fillRect(x + 7, y + 14, 2, 2);
+    }
+  }
+};
+
+// ==================== Debug 日志系统 (§DEBUG-9 + §WEB-1) ====================
+const DebugLog = {
+  lines: [],
+  maxLines: 500,
+  add(tag, msg) {
+    const timestamp = Date.now() % 100000;
+    const line = `[${timestamp}][${tag}] ${msg}`;
+    this.lines.push(line);
+    if (this.lines.length > this.maxLines) this.lines.shift();
+  },
+  draw() {
+    // 不再在屏幕上绘制
+  },
+  export() {
+    return this.lines.join('\n');
+  },
+  download() {
+    const content = this.export();
+    const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+    const filename = `afterwork_debug_${timestamp}.txt`;
+    const blob = new Blob([content], { type: 'text/plain' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    a.click();
+    URL.revokeObjectURL(url);
+    this.add('LOG', `downloaded ${filename} (${this.lines.length} lines)`);
+  }
+};
+
+// ==================== 场景管理 ====================
+const SceneManager = {
+  currentScene: 'home',
+  scenes: {},
+  transitionAlpha: 0,
+  transitioning: false,
+  transitionTarget: null,
+  transitionSpawn: null,
+  sceneSwitched: false,
+  exitCooldown: 0,
+
+  register(name, scene) {
+    this.scenes[name] = scene;
+  },
+
+  getCurrentScene() {
+    return this.scenes[this.currentScene];
+  },
+
+  transitionTo(sceneName, spawnX, spawnY) {
+    if (this.transitioning) {
+      DebugLog.add('WARN', `transition blocked: already transitioning to ${this.transitionTarget}`);
+      return;
+    }
+    DebugLog.add('GO', `transitionTo(${sceneName}, ${spawnX}, ${spawnY}) from=${this.currentScene}`);
+    this.transitioning = true;
+    this.transitionTarget = sceneName;
+    this.transitionSpawn = { x: spawnX, y: spawnY };
+    this.transitionAlpha = 0;
+    this.sceneSwitched = false;
+    AudioSystem.playTransition();
+  },
+
+  update() {
+    if (this.transitioning) {
+      this.transitionAlpha += 0.05;
+      if (this.transitionAlpha >= 1 && !this.sceneSwitched) {
+        // 切换场景（只执行一次）
+        const prevScene = this.currentScene;
+        this.currentScene = this.transitionTarget;
+        Player.reset(this.transitionSpawn.x, this.transitionSpawn.y);
+        SaveSystem.save({ scene: this.currentScene, x: Player.x, y: Player.y });
+        this.transitionTarget = null;
+        this.exitCooldown = 90;
+        this.sceneSwitched = true;
+        DebugLog.add('SCENE', `${prevScene}→${this.currentScene} spawn(${this.transitionSpawn.x},${this.transitionSpawn.y})`);
+      }
+      if (this.transitionAlpha >= 2) {
+        this.transitioning = false;
+        this.transitionAlpha = 0;
+      }
+    }
+    if (this.exitCooldown > 0) {
+      this.exitCooldown--;
+    }
+  },
+
+  draw() {
+    const scene = this.getCurrentScene();
+    if (scene) {
+      DebugLog.add('DRAW', `scene=${this.currentScene}`);
+      scene.draw();
+    } else {
+      DebugLog.add('WARN', `no scene found for ${this.currentScene}`);
+    }
+
+    // 过渡效果
+    if (this.transitioning) {
+      const alpha = this.transitionAlpha <= 1 ? this.transitionAlpha : 2 - this.transitionAlpha;
+      ctx.fillStyle = `rgba(0, 0, 0, ${alpha})`;
+      ctx.fillRect(0, 0, 320, 180);
+    }
+  }
+};
+
+// ==================== 对话系统 ====================
+const DialogueSystem = {
+  active: false,
+  lines: [],
+  currentLine: 0,
+  speaker: '',
+  displayText: '',
+  charIndex: 0,
+  charTimer: 0,
+  choices: null,
+  choiceSelection: 0,
+
+  start(speaker, lines) {
+    this.active = true;
+    this.speaker = speaker;
+    this.lines = lines;
+    this.currentLine = 0;
+    this.displayText = '';
+    this.charIndex = 0;
+    this.choices = null;
+    this.choiceSelection = 0;
+    AudioSystem.playInteract();
+  },
+
+  setChoices(choices) {
+    this.choices = choices;
+    this.choiceSelection = 0;
+  },
+
+  update() {
+    if (!this.active) return;
+
+    // 有选项时处理选择
+    if (this.choices && this.charIndex >= this.lines[this.currentLine].length) {
+      if (Input.wasPressed('ArrowUp') || Input.wasPressed('w') || Input.wasPressed('W')) {
+        this.choiceSelection = (this.choiceSelection - 1 + this.choices.length) % this.choices.length;
+      }
+      if (Input.wasPressed('ArrowDown') || Input.wasPressed('s') || Input.wasPressed('S')) {
+        this.choiceSelection = (this.choiceSelection + 1) % this.choices.length;
+      }
+      if (Input.getActionPressed()) {
+        const chosen = this.choices[this.choiceSelection];
+        this.active = false;
+        this.choices = null;
+        // 通知场景执行选择
+        if (window.onDialogueChoice) {
+          window.onDialogueChoice(chosen);
+        }
+      }
+      return;
+    }
+
+    // 文字逐字显示
+    this.charTimer++;
+    if (this.charTimer > 2) {
+      this.charTimer = 0;
+      if (this.charIndex < this.lines[this.currentLine].length) {
+        this.displayText += this.lines[this.currentLine][this.charIndex];
+        this.charIndex++;
+      }
+    }
+
+    // 继续对话
+    if (Input.getActionPressed()) {
+      if (this.charIndex < this.lines[this.currentLine].length) {
+        // 快速显示完整文字
+        this.displayText = this.lines[this.currentLine];
+        this.charIndex = this.lines[this.currentLine].length;
+      } else {
+        // 下一句
+        this.currentLine++;
+        if (this.currentLine >= this.lines.length) {
+          this.active = false;
+        } else {
+          this.displayText = '';
+          this.charIndex = 0;
+        }
+        AudioSystem.playInteract();
+      }
+    }
+  },
+
+  draw() {
+    if (!this.active) return;
+
+    // 对话框背景
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.85)';
+    ctx.fillRect(20, 130, 280, 45);
+    ctx.strokeStyle = COLORS.white;
+    ctx.lineWidth = 1;
+    ctx.strokeRect(20, 130, 280, 45);
+
+    // 说话人
+    ctx.fillStyle = COLORS.yellow;
+    ctx.font = '8px monospace';
+    ctx.fillText(this.speaker, 25, 142);
+
+    // 对话内容
+    ctx.fillStyle = COLORS.white;
+    ctx.font = '8px monospace';
+    const text = this.displayText;
+    // 自动换行
+    const maxWidth = 265;
+    let line = '';
+    let y = 155;
+    for (let i = 0; i < text.length; i++) {
+      const testLine = line + text[i];
+      const metrics = ctx.measureText(testLine);
+      if (metrics.width > maxWidth) {
+        ctx.fillText(line, 25, y);
+        line = text[i];
+        y += 10;
+      } else {
+        line = testLine;
+      }
+    }
+    ctx.fillText(line, 25, y);
+
+    // 选项
+    if (this.choices && this.charIndex >= this.lines[this.currentLine].length) {
+      ctx.fillStyle = 'rgba(0, 0, 0, 0.9)';
+      ctx.fillRect(20, 100, 280, 30);
+      ctx.strokeStyle = COLORS.yellow;
+      ctx.strokeRect(20, 100, 280, 30);
+
+      this.choices.forEach((choice, i) => {
+        const x = 30 + i * 90;
+        ctx.fillStyle = i === this.choiceSelection ? COLORS.yellow : COLORS.white;
+        ctx.font = '7px monospace';
+        ctx.fillText(choice.text, x, 118);
+      });
+    } else if (this.charIndex >= this.lines[this.currentLine].length) {
+      // 继续提示
+      ctx.fillStyle = COLORS.white;
+      ctx.fillText('▼', 290, 168);
+    }
+  }
+};
+
+// ==================== 迷你游戏系统 ====================
+const MiniGame = {
+  active: false,
+  type: null, // 'cards' or 'mixdrink'
+  state: {},
+
+  start(type) {
+    this.active = true;
+    this.type = type;
+    if (type === 'cards') {
+      this.state = {
+        playerCard: Math.floor(Math.random() * 13) + 1,
+        dealerCard: Math.floor(Math.random() * 13) + 1,
+        phase: 'betting', // betting, result
+        result: '',
+        selection: 0
+      };
+    } else if (type === 'mixdrink') {
+      this.state = {
+        step: 0, // 0: select base, 1: select mixer, 2: done
+        base: 0,
+        mixer: 0,
+        selection: 0,
+        bases: ['伏特加', '朗姆酒', '金酒', '威士忌'],
+        mixers: ['可乐', '橙汁', '苏打水', '汤力水']
+      };
+    }
+    AudioSystem.playInteract();
+  },
+
+  update() {
+    if (!this.active) return;
+
+    if (this.type === 'cards') {
+      this.updateCards();
+    } else if (this.type === 'mixdrink') {
+      this.updateMixDrink();
+    }
+  },
+
+  updateCards() {
+    const state = this.state;
+
+    if (state.phase === 'betting') {
+      if (Input.wasPressed('ArrowUp') || Input.wasPressed('w') || Input.wasPressed('W')) {
+        state.selection = 0;
+      }
+      if (Input.wasPressed('ArrowDown') || Input.wasPressed('s') || Input.wasPressed('S')) {
+        state.selection = 1;
+      }
+      if (Input.getActionPressed()) {
+        if (state.selection === 0) {
+          // 出牌
+          state.phase = 'result';
+          if (state.playerCard > state.dealerCard) {
+            state.result = '你赢了！';
+          } else if (state.playerCard < state.dealerCard) {
+            state.result = '你输了...';
+          } else {
+            state.result = '平局！';
+          }
+          AudioSystem.playInteract();
+        } else {
+          // 退出
+          this.active = false;
+        }
+      }
+    } else if (state.phase === 'result') {
+      if (Input.getActionPressed()) {
+        // 重新开始或退出
+        state.phase = 'betting';
+        state.playerCard = Math.floor(Math.random() * 13) + 1;
+        state.dealerCard = Math.floor(Math.random() * 13) + 1;
+        state.result = '';
+      }
+    }
+  },
+
+  updateMixDrink() {
+    const state = this.state;
+
+    if (state.step === 0) {
+      // 选基酒
+      if (Input.wasPressed('ArrowLeft') || Input.wasPressed('a') || Input.wasPressed('A')) {
+        state.selection = (state.selection - 1 + 4) % 4;
+      }
+      if (Input.wasPressed('ArrowRight') || Input.wasPressed('d') || Input.wasPressed('D')) {
+        state.selection = (state.selection + 1) % 4;
+      }
+      if (Input.getActionPressed()) {
+        state.base = state.selection;
+        state.step = 1;
+        state.selection = 0;
+        AudioSystem.playInteract();
+      }
+    } else if (state.step === 1) {
+      // 选配料
+      if (Input.wasPressed('ArrowLeft') || Input.wasPressed('a') || Input.wasPressed('A')) {
+        state.selection = (state.selection - 1 + 4) % 4;
+      }
+      if (Input.wasPressed('ArrowRight') || Input.wasPressed('d') || Input.wasPressed('D')) {
+        state.selection = (state.selection + 1) % 4;
+      }
+      if (Input.getActionPressed()) {
+        state.mixer = state.selection;
+        state.step = 2;
+        AudioSystem.playInteract();
+      }
+    } else if (state.step === 2) {
+      // 完成
+      if (Input.getActionPressed()) {
+        this.active = false;
+      }
+    }
+
+    if (Input.wasPressed('Escape')) {
+      this.active = false;
+    }
+  },
+
+  draw() {
+    if (!this.active) return;
+
+    // 背景遮罩
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+    ctx.fillRect(0, 0, 320, 180);
+
+    if (this.type === 'cards') {
+      this.drawCards();
+    } else if (this.type === 'mixdrink') {
+      this.drawMixDrink();
+    }
+  },
+
+  drawCards() {
+    const state = this.state;
+
+    // 标题
+    ctx.fillStyle = COLORS.yellow;
+    ctx.font = '10px monospace';
+    ctx.fillText('比大小', 140, 30);
+
+    // 玩家牌
+    ctx.fillStyle = COLORS.white;
+    ctx.fillRect(80, 50, 40, 50);
+    ctx.fillStyle = COLORS.black;
+    ctx.font = '16px monospace';
+    ctx.fillText(this.getCardName(state.playerCard), 92, 80);
+
+    // 庄家牌
+    ctx.fillStyle = COLORS.white;
+    ctx.fillRect(200, 50, 40, 50);
+    ctx.fillStyle = COLORS.black;
+    ctx.font = '16px monospace';
+    ctx.fillText(this.getCardName(state.dealerCard), 212, 80);
+
+    // 标签
+    ctx.fillStyle = COLORS.white;
+    ctx.font = '8px monospace';
+    ctx.fillText('你', 95, 110);
+    ctx.fillText('庄家', 210, 110);
+
+    if (state.phase === 'betting') {
+      ctx.fillStyle = COLORS.white;
+      ctx.font = '8px monospace';
+      ctx.fillText('出牌', 150, 135);
+      ctx.fillText('退出', 150, 150);
+
+      // 选择框
+      const selY = state.selection === 0 ? 130 : 145;
+      ctx.strokeStyle = COLORS.yellow;
+      ctx.strokeRect(140, selY, 40, 10);
+    } else if (state.phase === 'result') {
+      ctx.fillStyle = COLORS.yellow;
+      ctx.font = '10px monospace';
+      ctx.fillText(state.result, 130, 140);
+      ctx.fillStyle = COLORS.white;
+      ctx.font = '8px monospace';
+      ctx.fillText('按空格继续', 120, 160);
+    }
+  },
+
+  getCardName(value) {
+    if (value === 1) return 'A';
+    if (value === 11) return 'J';
+    if (value === 12) return 'Q';
+    if (value === 13) return 'K';
+    return value.toString();
+  },
+
+  drawMixDrink() {
+    const state = this.state;
+
+    ctx.fillStyle = COLORS.yellow;
+    ctx.font = '10px monospace';
+    ctx.fillText('调酒', 145, 25);
+
+    if (state.step === 0) {
+      ctx.fillStyle = COLORS.white;
+      ctx.font = '8px monospace';
+      ctx.fillText('选择基酒:', 130, 45);
+
+      state.bases.forEach((base, i) => {
+        const x = 60 + i * 55;
+        ctx.fillStyle = i === state.selection ? COLORS.yellow : COLORS.white;
+        ctx.fillText(base, x, 70);
+      });
+
+      ctx.fillStyle = COLORS.lightGray;
+      ctx.fillText('← → 选择  空格 确认', 90, 150);
+    } else if (state.step === 1) {
+      ctx.fillStyle = COLORS.white;
+      ctx.font = '8px monospace';
+      ctx.fillText('选择配料:', 130, 45);
+
+      state.mixers.forEach((mixer, i) => {
+        const x = 60 + i * 55;
+        ctx.fillStyle = i === state.selection ? COLORS.yellow : COLORS.white;
+        ctx.fillText(mixer, x, 70);
+      });
+
+      ctx.fillStyle = COLORS.lightGray;
+      ctx.fillText('← → 选择  空格 确认', 90, 150);
+    } else if (state.step === 2) {
+      ctx.fillStyle = COLORS.green;
+      ctx.font = '10px monospace';
+      ctx.fillText('调好了！', 130, 60);
+
+      ctx.fillStyle = COLORS.white;
+      ctx.font = '8px monospace';
+      ctx.fillText(`${state.bases[state.base]} + ${state.mixers[state.mixer]}`, 100, 90);
+
+      ctx.fillStyle = COLORS.lightGray;
+      ctx.fillText('按空格继续', 125, 130);
+    }
+  }
+};
+
+// ==================== 场景定义 ====================
+
+// 场景1：家里
+const sceneHome = {
+  colliders: [
+    { x: 0, y: 0, w: 150, h: 40 },     // 上墙（左）
+    { x: 190, y: 0, w: 130, h: 40 },   // 上墙（右）
+    { x: 0, y: 0, w: 20, h: 180 },     // 左墙
+    { x: 300, y: 0, w: 20, h: 180 },   // 右墙
+    { x: 0, y: 170, w: 130, h: 10 },    // 下墙左（门在中间）
+    { x: 190, y: 170, w: 130, h: 10 },  // 下墙右（门在中间）
+    { x: 40, y: 50, w: 40, h: 25 },     // 床
+    { x: 240, y: 50, w: 30, h: 30 },    // 书桌
+    { x: 100, y: 50, w: 25, h: 20 }     // 唱片机
+  ],
+  interactables: [
+    { x: 100, y: 50, w: 25, h: 20, type: 'record', label: '唱片机' }
+  ],
+  exits: [
+    { x: 130, y: 145, w: 60, h: 25, target: 'alley', spawnX: 160, spawnY: 80 },
+    { x: 150, y: 10, w: 40, h: 25, target: 'balcony', spawnX: 160, spawnY: 150 }
+  ],
+
+  draw() {
+    // 地板
+    ctx.fillStyle = COLORS.wood;
+    ctx.fillRect(0, 0, 320, 180);
+
+    // 墙壁
+    ctx.fillStyle = COLORS.wallColor;
+    ctx.fillRect(0, 0, 320, 40);
+
+    // 地毯
+    ctx.fillStyle = COLORS.carpet;
+    ctx.fillRect(60, 80, 200, 70);
+
+    // 床
+    ctx.fillStyle = COLORS.brown;
+    ctx.fillRect(40, 50, 40, 25);
+    ctx.fillStyle = COLORS.white;
+    ctx.fillRect(42, 52, 36, 20);
+    ctx.fillStyle = COLORS.lightGray;
+    ctx.fillRect(42, 52, 10, 8);
+
+    // 书桌
+    ctx.fillStyle = COLORS.darkBrown;
+    ctx.fillRect(240, 50, 30, 30);
+    ctx.fillStyle = COLORS.lightWood;
+    ctx.fillRect(242, 52, 26, 26);
+
+    // 唱片机
+    ctx.fillStyle = COLORS.black;
+    ctx.fillRect(100, 50, 25, 20);
+    ctx.fillStyle = COLORS.gray;
+    ctx.fillRect(102, 52, 21, 16);
+    ctx.fillStyle = COLORS.black;
+    ctx.fillRect(108, 56, 9, 9);
+    ctx.fillStyle = COLORS.red;
+    ctx.fillRect(111, 59, 3, 3);
+
+    // 窗户
+    ctx.fillStyle = COLORS.nightSky;
+    ctx.fillRect(150, 10, 40, 25);
+    ctx.strokeStyle = COLORS.white;
+    ctx.lineWidth = 1;
+    ctx.strokeRect(150, 10, 40, 25);
+    ctx.beginPath();
+    ctx.moveTo(170, 10);
+    ctx.lineTo(170, 35);
+    ctx.moveTo(150, 22);
+    ctx.lineTo(190, 22);
+    ctx.stroke();
+
+    // 星星
+    ctx.fillStyle = COLORS.star;
+    ctx.fillRect(155, 15, 2, 2);
+    ctx.fillRect(175, 18, 2, 2);
+    ctx.fillRect(182, 28, 2, 2);
+
+    // 门
+    ctx.fillStyle = COLORS.darkBrown;
+    ctx.fillRect(145, 160, 30, 20);
+    ctx.fillStyle = COLORS.yellow;
+    ctx.fillRect(168, 170, 3, 3);
+
+    // 提示
+    this.drawInteractHints();
+  },
+
+  drawInteractHints() {
+    // 唱片机提示
+    if (this.isNearRecord()) {
+      ctx.fillStyle = COLORS.yellow;
+      ctx.font = '8px monospace';
+      ctx.fillText('按空格播放音乐', 90, 45);
+    }
+
+    // 门提示
+    if (Player.y > 145 && Player.x > 130 && Player.x < 190) {
+      ctx.fillStyle = COLORS.yellow;
+      ctx.font = '8px monospace';
+      ctx.fillText('出门 → 楼道', 130, 150);
+    }
+  },
+
+  isNearRecord() {
+    return Player.x < 130 && Player.x > 90 && Player.y < 75 && Player.y > 45;
+  },
+
+  update() {
+    // 唱片机互动
+    if (Input.getActionPressed() && this.isNearRecord()) {
+      if (AudioSystem.musicPlaying) {
+        AudioSystem.stopMusic();
+      } else {
+        AudioSystem.startMusic();
+      }
+      AudioSystem.playInteract();
+    }
+
+    // 出口检测（带冷却）
+    if (SceneManager.exitCooldown === 0) {
+      for (const exit of this.exits) {
+        const overlap = Player.x + Player.width > exit.x && Player.x < exit.x + exit.w &&
+            Player.y + Player.height > exit.y && Player.y < exit.y + exit.h;
+        DebugLog.add('EXIT', `scene=home exit→${exit.target} overlap=${overlap} P(${Math.floor(Player.x)},${Math.floor(Player.y)}) E(${exit.x},${exit.y},${exit.w}x${exit.h})`);
+        if (overlap) {
+          SceneManager.transitionTo(exit.target, exit.spawnX, exit.spawnY);
+          break;
+        }
+      }
+    } else {
+      DebugLog.add('EXIT', `cooldown=${SceneManager.exitCooldown}`);
+    }
+  }
+};
+
+// 场景2：阳台
+const sceneBalcony = {
+  colliders: [
+    { x: 0, y: 0, w: 320, h: 30 },      // 栏杆
+    { x: 0, y: 0, w: 20, h: 150 },      // 左墙上段（出口在下方）
+    { x: 0, y: 165, w: 20, h: 15 },     // 左墙下段
+    { x: 290, y: 0, w: 30, h: 180 },    // 右墙
+    { x: 75, y: 165, w: 245, h: 15 },   // 下墙（门在左侧）
+    { x: 50, y: 60, w: 30, h: 25 },     // 鱼缸
+    { x: 240, y: 70, w: 20, h: 20 }     // 盆栽
+  ],
+  exits: [
+    { x: 20, y: 155, w: 55, h: 10, target: 'home', spawnX: 160, spawnY: 140 }
+  ],
+  fish: [
+    { x: 60, y: 70, dir: 1, speed: 0.3 },
+    { x: 70, y: 75, dir: -1, speed: 0.4 },
+    { x: 65, y: 72, dir: 1, speed: 0.35 }
+  ],
+  plantWatered: false,
+
+  draw() {
+    // 夜空背景
+    ctx.fillStyle = COLORS.nightSky;
+    ctx.fillRect(0, 0, 320, 180);
+
+    // 星星
+    ctx.fillStyle = COLORS.star;
+    for (let i = 0; i < 20; i++) {
+      const x = (i * 37) % 320;
+      const y = (i * 23) % 100;
+      ctx.fillRect(x, y, 1, 1);
+    }
+
+    // 城市剪影
+    ctx.fillStyle = '#1a1a3e';
+    ctx.fillRect(0, 100, 40, 80);
+    ctx.fillRect(50, 110, 30, 70);
+    ctx.fillRect(90, 95, 50, 85);
+    ctx.fillRect(150, 105, 40, 75);
+    ctx.fillRect(200, 100, 60, 80);
+    ctx.fillRect(270, 110, 50, 70);
+
+    // 窗户灯光
+    ctx.fillStyle = COLORS.yellow;
+    for (let i = 0; i < 10; i++) {
+      const x = 10 + (i * 30) % 280;
+      const y = 110 + (i * 15) % 50;
+      ctx.fillRect(x, y, 3, 4);
+    }
+
+    // 阳台地板
+    ctx.fillStyle = COLORS.gray;
+    ctx.fillRect(0, 140, 320, 40);
+
+    // 栏杆
+    ctx.fillStyle = COLORS.darkBrown;
+    ctx.fillRect(0, 25, 320, 5);
+    for (let i = 0; i < 16; i++) {
+      ctx.fillRect(i * 20 + 5, 10, 3, 20);
+    }
+
+    // 鱼缸
+    ctx.fillStyle = 'rgba(100, 200, 255, 0.3)';
+    ctx.fillRect(50, 60, 30, 25);
+    ctx.strokeStyle = COLORS.white;
+    ctx.lineWidth = 1;
+    ctx.strokeRect(50, 60, 30, 25);
+
+    // 鱼
+    this.fish.forEach(fish => {
+      ctx.fillStyle = COLORS.orange;
+      ctx.fillRect(fish.x, fish.y, 4, 2);
+      ctx.fillRect(fish.x + (fish.dir > 0 ? 4 : -2), fish.y, 2, 2);
+    });
+
+    // 盆栽
+    ctx.fillStyle = COLORS.brown;
+    ctx.fillRect(242, 85, 16, 8);
+    ctx.fillStyle = this.plantWatered ? COLORS.green : '#556b2f';
+    ctx.fillRect(245, 70, 10, 15);
+    ctx.fillRect(240, 75, 6, 8);
+    ctx.fillRect(254, 75, 6, 8);
+
+    // 门（回家）
+    ctx.fillStyle = COLORS.darkBrown;
+    ctx.fillRect(35, 155, 30, 25);
+    ctx.fillStyle = COLORS.yellow;
+    ctx.fillRect(58, 168, 3, 3);
+
+    // 提示
+    this.drawHints();
+  },
+
+  drawHints() {
+    if (Player.x < 90 && Player.x > 40 && Player.y < 90 && Player.y > 55) {
+      ctx.fillStyle = COLORS.yellow;
+      ctx.font = '8px monospace';
+      ctx.fillText('鱼缸', 55, 55);
+    }
+
+    if (Player.x < 265 && Player.x > 235 && Player.y < 95 && Player.y > 65) {
+      ctx.fillStyle = COLORS.yellow;
+      ctx.font = '8px monospace';
+      ctx.fillText(this.plantWatered ? '已浇水' : '按空格浇水', 220, 65);
+    }
+
+    if (Player.y > 145 && Player.x < 80) {
+      ctx.fillStyle = COLORS.yellow;
+      ctx.font = '8px monospace';
+      ctx.fillText('回家', 40, 150);
+    }
+  },
+
+  update() {
+    // 鱼动画
+    this.fish.forEach(fish => {
+      fish.x += fish.dir * fish.speed;
+      if (fish.x < 52 || fish.x > 76) {
+        fish.dir *= -1;
+      }
+    });
+
+    // 盆栽互动
+    if (Input.getActionPressed() && Player.x < 265 && Player.x > 235 && Player.y < 95 && Player.y > 65) {
+      if (!this.plantWatered) {
+        this.plantWatered = true;
+        AudioSystem.playInteract();
+      }
+    }
+
+    // 出口（带冷却）
+    if (SceneManager.exitCooldown === 0) {
+      for (const exit of this.exits) {
+        if (Player.x + Player.width > exit.x && Player.x < exit.x + exit.w &&
+            Player.y + Player.height > exit.y && Player.y < exit.y + exit.h) {
+          SceneManager.transitionTo(exit.target, exit.spawnX, exit.spawnY);
+          break;
+        }
+      }
+    }
+  }
+};
+
+// 场景3：楼间（含一楼大厅和上楼楼梯）
+const sceneAlley = {
+  colliders: [
+    { x: 0, y: 0, w: 140, h: 25 },     // 上墙（左）
+    { x: 180, y: 0, w: 140, h: 25 },   // 上墙（右）
+    { x: 0, y: 0, w: 40, h: 180 },     // 左墙
+    { x: 280, y: 0, w: 40, h: 180 },   // 右墙
+    { x: 100, y: 40, w: 30, h: 5 },     // 上楼楼梯（出口上方）
+    { x: 190, y: 40, w: 30, h: 5 },     // 下楼楼梯（出口上方）
+    { x: 140, y: 160, w: 40, h: 5 }     // 酒吧门（出口上方）
+  ],
+  exits: [
+    { x: 140, y: 0, w: 40, h: 25, target: 'home', spawnX: 160, spawnY: 80 },
+    { x: 190, y: 25, w: 30, h: 15, target: 'bar', spawnX: 160, spawnY: 80 },
+    { x: 140, y: 150, w: 40, h: 10, target: 'bar', spawnX: 160, spawnY: 80 }
+  ],
+
+  draw() {
+    // 墙壁
+    ctx.fillStyle = COLORS.gray;
+    ctx.fillRect(0, 0, 320, 180);
+
+    // 楼道地板
+    ctx.fillStyle = COLORS.floorColor;
+    ctx.fillRect(40, 30, 240, 150);
+
+    // 楼梯（上）
+    ctx.fillStyle = COLORS.darkBrown;
+    ctx.fillRect(100, 30, 30, 10);
+    for (let i = 0; i < 5; i++) {
+      ctx.fillRect(100 + i * 6, 30 + i * 2, 6, 2);
+    }
+
+    // 楼梯（下）
+    ctx.fillStyle = COLORS.darkBrown;
+    ctx.fillRect(190, 30, 30, 10);
+    for (let i = 0; i < 5; i++) {
+      ctx.fillRect(190 + i * 6, 30 + i * 2, 6, 2);
+    }
+
+    // 门框
+    ctx.fillStyle = COLORS.darkBrown;
+    ctx.fillRect(140, 145, 40, 20);
+    ctx.fillStyle = COLORS.wood;
+    ctx.fillRect(145, 150, 30, 15);
+
+    // 酒吧标志
+    ctx.fillStyle = COLORS.red;
+    ctx.fillRect(145, 135, 30, 8);
+    ctx.fillStyle = COLORS.white;
+    ctx.font = '6px monospace';
+    ctx.fillText('BAR', 152, 141);
+
+    // 窗户
+    ctx.fillStyle = COLORS.nightSky;
+    ctx.fillRect(60, 60, 30, 40);
+    ctx.fillRect(230, 60, 30, 40);
+    ctx.strokeStyle = COLORS.white;
+    ctx.strokeRect(60, 60, 30, 40);
+    ctx.strokeRect(230, 60, 30, 40);
+
+    // 扶手
+    ctx.fillStyle = COLORS.lightGray;
+    ctx.fillRect(45, 40, 3, 130);
+    ctx.fillRect(272, 40, 3, 130);
+
+    // 提示
+    this.drawHints();
+  },
+
+  drawHints() {
+    if (Player.y < 45 && Player.x < 130 && Player.x > 95) {
+      ctx.fillStyle = COLORS.yellow;
+      ctx.font = '8px monospace';
+      ctx.fillText('上楼回家', 95, 20);
+    }
+    if (Player.y < 45 && Player.x < 220 && Player.x > 185) {
+      ctx.fillStyle = COLORS.yellow;
+      ctx.font = '8px monospace';
+      ctx.fillText('下楼到一楼', 185, 20);
+    }
+    if (Player.y > 145 && Player.x < 180 && Player.x > 135) {
+      ctx.fillStyle = COLORS.yellow;
+      ctx.font = '8px monospace';
+      ctx.fillText('进酒吧', 145, 145);
+    }
+  },
+
+  update() {
+    if (SceneManager.exitCooldown === 0) {
+      for (const exit of this.exits) {
+        const overlap = Player.x + Player.width > exit.x && Player.x < exit.x + exit.w &&
+            Player.y + Player.height > exit.y && Player.y < exit.y + exit.h;
+        DebugLog.add('EXIT', `scene=alley exit→${exit.target} overlap=${overlap} P(${Math.floor(Player.x)},${Math.floor(Player.y)}) E(${exit.x},${exit.y},${exit.w}x${exit.h})`);
+        if (overlap) {
+          SceneManager.transitionTo(exit.target, exit.spawnX, exit.spawnY);
+          break;
+        }
+      }
+    } else {
+      DebugLog.add('EXIT', `cooldown=${SceneManager.exitCooldown}`);
+    }
+  }
+};
+
+// 场景4：酒吧
+const sceneBar = {
+  colliders: [
+    { x: 0, y: 0, w: 320, h: 40 },     // 上墙
+    { x: 0, y: 0, w: 20, h: 180 },     // 左墙
+    { x: 300, y: 0, w: 20, h: 180 },   // 右墙
+    { x: 0, y: 170, w: 130, h: 10 },    // 下墙左
+    { x: 190, y: 170, w: 130, h: 10 },  // 下墙右
+    { x: 40, y: 50, w: 80, h: 20 },     // 吧台
+    { x: 200, y: 80, w: 30, h: 30 },    // 桌子1
+    { x: 240, y: 120, w: 30, h: 30 }    // 桌子2
+  ],
+  exits: [
+    { x: 130, y: 155, w: 60, h: 15, target: 'alley', spawnX: 160, spawnY: 80 },
+    { x: 290, y: 80, w: 15, h: 30, target: 'yard', spawnX: 50, spawnY: 90 }
+  ],
+  npcs: [
+    { x: 60, y: 55, type: 'bartender', name: '调酒师' },
+    { x: 210, y: 90, type: 'customer', name: '客人' }
+  ],
+
+  draw() {
+    // 地板
+    ctx.fillStyle = COLORS.darkBrown;
+    ctx.fillRect(0, 0, 320, 180);
+
+    // 墙壁
+    ctx.fillStyle = COLORS.wallColor;
+    ctx.fillRect(0, 0, 320, 40);
+
+    // 吧台
+    ctx.fillStyle = COLORS.wood;
+    ctx.fillRect(40, 50, 80, 20);
+    ctx.fillStyle = COLORS.lightWood;
+    ctx.fillRect(40, 50, 80, 5);
+
+    // 酒架
+    ctx.fillStyle = COLORS.darkBrown;
+    ctx.fillRect(45, 20, 70, 25);
+    // 酒瓶
+    const bottleColors = [COLORS.red, COLORS.green, COLORS.blue, COLORS.yellow, COLORS.orange];
+    for (let i = 0; i < 5; i++) {
+      ctx.fillStyle = bottleColors[i];
+      ctx.fillRect(50 + i * 12, 25, 6, 15);
+      ctx.fillStyle = COLORS.white;
+      ctx.fillRect(50 + i * 12, 25, 6, 3);
+    }
+
+    // 调酒师
+    ctx.fillStyle = COLORS.white;
+    ctx.fillRect(58, 55, 8, 10);
+    ctx.fillStyle = COLORS.skin;
+    ctx.fillRect(59, 50, 6, 5);
+    ctx.fillStyle = COLORS.black;
+    ctx.fillRect(59, 48, 6, 2);
+
+    // 桌子
+    ctx.fillStyle = COLORS.brown;
+    ctx.fillRect(200, 80, 30, 30);
+    ctx.fillRect(240, 120, 30, 30);
+
+    // 客人
+    ctx.fillStyle = COLORS.green;
+    ctx.fillRect(210, 85, 8, 10);
+    ctx.fillStyle = COLORS.skin;
+    ctx.fillRect(211, 80, 6, 5);
+
+    // 后门
+    ctx.fillStyle = COLORS.darkBrown;
+    ctx.fillRect(292, 80, 10, 30);
+
+    // 前门
+    ctx.fillStyle = COLORS.darkBrown;
+    ctx.fillRect(145, 155, 30, 25);
+
+    // 灯光效果
+    ctx.fillStyle = 'rgba(255, 200, 100, 0.1)';
+    ctx.fillRect(100, 60, 120, 80);
+
+    // 提示
+    this.drawHints();
+  },
+
+  drawHints() {
+    // 调酒师
+    if (Player.x < 90 && Player.x > 40 && Player.y < 80 && Player.y > 45) {
+      ctx.fillStyle = COLORS.yellow;
+      ctx.font = '8px monospace';
+      ctx.fillText('按空格调酒', 50, 45);
+    }
+
+    // 客人
+    if (Player.x < 240 && Player.x > 195 && Player.y < 115 && Player.y > 75) {
+      ctx.fillStyle = COLORS.yellow;
+      ctx.font = '8px monospace';
+      ctx.fillText('按空格打牌', 200, 75);
+    }
+
+    // 后门
+    if (Player.x > 280 && Player.y < 115 && Player.y > 75) {
+      ctx.fillStyle = COLORS.yellow;
+      ctx.font = '8px monospace';
+      ctx.fillText('去后院', 285, 75);
+    }
+
+    // 前门
+    if (Player.y > 145 && Player.x > 125 && Player.x < 195) {
+      ctx.fillStyle = COLORS.yellow;
+      ctx.font = '8px monospace';
+      ctx.fillText('回楼道', 140, 150);
+    }
+  },
+
+  bartenderTalked: false,
+  bartenderDialogue: [
+    '哟，来了。想喝点什么？',
+    '我们这儿有伏特加、朗姆、金酒、威士忌...',
+    '随便选基酒和配料，我给你调一杯。'
+  ],
+
+  update() {
+    // 调酒师互动
+    if (Input.getActionPressed() && Player.x < 90 && Player.x > 40 && Player.y < 80 && Player.y > 45) {
+      if (!this.bartenderTalked) {
+        DialogueSystem.start('调酒师', this.bartenderDialogue);
+        this.bartenderTalked = true;
+      } else {
+        MiniGame.start('mixdrink');
+      }
+    }
+
+    // 客人互动
+    if (Input.getActionPressed() && Player.x < 240 && Player.x > 195 && Player.y < 115 && Player.y > 75) {
+      MiniGame.start('cards');
+    }
+
+    // 出口（带冷却）
+    if (SceneManager.exitCooldown === 0) {
+      for (const exit of this.exits) {
+        if (Player.x + Player.width > exit.x && Player.x < exit.x + exit.w &&
+            Player.y + Player.height > exit.y && Player.y < exit.y + exit.h) {
+          SceneManager.transitionTo(exit.target, exit.spawnX, exit.spawnY);
+          break;
+        }
+      }
+    }
+  }
+};
+
+// 场景5：后院
+const sceneYard = {
+  colliders: [
+    { x: 0, y: 0, w: 150, h: 20 },     // 上墙（左）
+    { x: 190, y: 0, w: 130, h: 20 },   // 上墙（右）
+    { x: 0, y: 0, w: 25, h: 75 },       // 左墙上段（出口在下方）
+    { x: 0, y: 115, w: 25, h: 65 },     // 左墙下段
+    { x: 290, y: 0, w: 30, h: 180 },    // 右墙
+    { x: 0, y: 160, w: 320, h: 20 },    // 下墙
+    { x: 100, y: 70, w: 40, h: 25 },    // 长椅
+    { x: 200, y: 100, w: 20, h: 20 }    // 烟灰缸
+  ],
+  exits: [
+    { x: 25, y: 75, w: 25, h: 40, target: 'bar', spawnX: 280, spawnY: 90 }
+  ],
+  npc: { x: 115, y: 75, talking: false },
+  dialogueIndex: 0,
+  // 对话树：每次选择不同话题
+  dialogueTree: {
+    start: {
+      speaker: '老陈',
+      line: '（吐出一口烟）...下班了？',
+      choices: [
+        { text: '工作好累', next: 'tired' },
+        { text: '今天不错', next: 'good' },
+        { text: '不想说话', next: 'quiet' }
+      ]
+    },
+    tired: {
+      speaker: '老陈',
+      line: '（叹气）都一样。来，坐会儿。',
+      choices: [
+        { text: '嗯...', next: 'end1' },
+        { text: '来根烟？', next: 'smoke' }
+      ]
+    },
+    good: {
+      speaker: '老陈',
+      line: '那就好。难得有舒坦的时候。',
+      choices: [
+        { text: '是啊', next: 'end2' },
+        { text: '来根烟？', next: 'smoke' }
+      ]
+    },
+    quiet: {
+      speaker: '老陈',
+      line: '（点头）...安静也好。',
+      choices: [
+        { text: '...', next: 'end3' }
+      ]
+    },
+    smoke: {
+      speaker: '老陈',
+      line: '（递过来）这夜晚的风，真舒服啊...',
+      choices: [
+        { text: '谢谢', next: 'end4' }
+      ]
+    },
+    end1: { speaker: '老陈', line: '休息够了再回去吧。', choices: [] },
+    end2: { speaker: '老陈', line: '好好享受这夜晚。', choices: [] },
+    end3: { speaker: '老陈', line: '（一起沉默地看着夜空）', choices: [] },
+    end4: { speaker: '老陈', line: '不客气。常来坐。', choices: [] }
+  },
+  currentNode: 'start',
+  choiceSelection: 0,
+
+  draw() {
+    // 夜空
+    ctx.fillStyle = COLORS.nightSky;
+    ctx.fillRect(0, 0, 320, 180);
+
+    // 星星
+    ctx.fillStyle = COLORS.star;
+    for (let i = 0; i < 30; i++) {
+      const x = (i * 41) % 320;
+      const y = (i * 19) % 80;
+      ctx.fillRect(x, y, 1, 1);
+    }
+
+    // 月亮
+    ctx.fillStyle = COLORS.yellow;
+    ctx.beginPath();
+    ctx.arc(260, 40, 15, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = COLORS.nightSky;
+    ctx.beginPath();
+    ctx.arc(255, 38, 12, 0, Math.PI * 2);
+    ctx.fill();
+
+    // 地面
+    ctx.fillStyle = COLORS.gray;
+    ctx.fillRect(0, 120, 320, 60);
+
+    // 围墙
+    ctx.fillStyle = COLORS.darkBrown;
+    ctx.fillRect(0, 100, 320, 20);
+    for (let i = 0; i < 16; i++) {
+      ctx.fillRect(i * 20, 95, 15, 5);
+    }
+
+    // 长椅
+    ctx.fillStyle = COLORS.brown;
+    ctx.fillRect(100, 75, 40, 5);
+    ctx.fillRect(102, 80, 3, 15);
+    ctx.fillRect(135, 80, 3, 15);
+    ctx.fillRect(100, 70, 40, 3);
+
+    // NPC（老陈）
+    ctx.fillStyle = COLORS.darkBlue;
+    ctx.fillRect(113, 75, 8, 10);
+    ctx.fillStyle = COLORS.skin;
+    ctx.fillRect(114, 70, 6, 5);
+    ctx.fillStyle = COLORS.gray;
+    ctx.fillRect(114, 68, 6, 2);
+
+    // 烟
+    ctx.fillStyle = COLORS.white;
+    ctx.fillRect(122, 72, 4, 1);
+    // 烟雾
+    ctx.fillStyle = 'rgba(200, 200, 200, 0.5)';
+    ctx.fillRect(126, 70, 3, 3);
+    ctx.fillRect(129, 68, 2, 2);
+
+    // 烟灰缸
+    ctx.fillStyle = COLORS.gray;
+    ctx.fillRect(200, 105, 20, 10);
+    ctx.fillStyle = COLORS.darkBrown;
+    ctx.fillRect(202, 107, 16, 6);
+
+    // 门（回酒吧）
+    ctx.fillStyle = COLORS.darkBrown;
+    ctx.fillRect(32, 80, 15, 30);
+
+    // 提示
+    this.drawHints();
+  },
+
+  drawHints() {
+    if (Player.x < 140 && Player.x > 95 && Player.y < 100 && Player.y > 65) {
+      ctx.fillStyle = COLORS.yellow;
+      ctx.font = '8px monospace';
+      ctx.fillText('按空格聊天', 95, 65);
+    }
+
+    if (Player.x < 55 && Player.y < 120 && Player.y > 70) {
+      ctx.fillStyle = COLORS.yellow;
+      ctx.font = '8px monospace';
+      ctx.fillText('回酒吧', 35, 75);
+    }
+  },
+
+  update() {
+    // NPC对话树
+    if (Input.getActionPressed() && Player.x < 140 && Player.x > 95 && Player.y < 100 && Player.y > 65) {
+      if (!DialogueSystem.active) {
+        const node = this.dialogueTree[this.currentNode];
+        if (node && node.choices.length > 0) {
+          // 显示对话，结束后弹出选择
+          DialogueSystem.start(node.speaker, [node.line]);
+          this.pendingChoices = node.choices;
+        } else if (node) {
+          // 终点，重置
+          DialogueSystem.start(node.speaker, [node.line]);
+          this.currentNode = 'start';
+        }
+      }
+    }
+
+    // 对话结束后弹出选项
+    if (!DialogueSystem.active && this.pendingChoices && this.pendingChoices.length > 0) {
+      DialogueSystem.setChoices(this.pendingChoices);
+      this.pendingChoices = null;
+    }
+
+    // 出口（带冷却）
+    if (SceneManager.exitCooldown === 0) {
+      for (const exit of this.exits) {
+        if (Player.x + Player.width > exit.x && Player.x < exit.x + exit.w &&
+            Player.y + Player.height > exit.y && Player.y < exit.y + exit.h) {
+          SceneManager.transitionTo(exit.target, exit.spawnX, exit.spawnY);
+          break;
+        }
+      }
+    }
+  }
+};
+
+// ==================== 初始化 ====================
+function init() {
+  AudioSystem.init();
+  Input.init();
+
+  // 注册场景
+  SceneManager.register('home', sceneHome);
+  SceneManager.register('balcony', sceneBalcony);
+  SceneManager.register('alley', sceneAlley);
+  SceneManager.register('bar', sceneBar);
+  SceneManager.register('yard', sceneYard);
+
+  // 全局对话选择处理
+  window.onDialogueChoice = function(chosen) {
+    if (SceneManager.currentScene === 'yard' && chosen && chosen.next) {
+      sceneYard.currentNode = chosen.next;
+    }
+  };
+
+  // 加载存档
+  const save = SaveSystem.load();
+  if (save && save.scene) {
+    SceneManager.currentScene = save.scene;
+    Player.reset(save.x || 160, save.y || 120);
+  }
+
+  // 开始环境音
+  setTimeout(() => AudioSystem.playAmbient(), 1000);
+
+  // 开始游戏循环
+  gameLoop();
+}
+
+// ==================== 游戏循环 ====================
+function gameLoop() {
+  // 调试：按 L 键下载日志 (§DEBUG-9 + §WEB-1)
+  if (Input.wasPressed('l') || Input.wasPressed('L')) {
+    DebugLog.download();
+  }
+
+  // 更新
+  if (!SceneManager.transitioning) {
+    Player.update();
+    const scene = SceneManager.getCurrentScene();
+    if (scene && scene.update) {
+      scene.update();
+    }
+    DialogueSystem.update();
+    MiniGame.update();
+  }
+  SceneManager.update();
+
+  // 绘制
+  ctx.clearRect(0, 0, 320, 180);
+  SceneManager.draw();
+  if (!SceneManager.transitioning) {
+    const scene = SceneManager.getCurrentScene();
+    if (scene) {
+      Player.draw();
+    }
+    DialogueSystem.draw();
+    MiniGame.draw();
+  }
+
+  // Debug overlay (§DEBUG-9 + §WEB-1)
+  DebugLog.draw();
+
+  // 清除输入状态
+  Input.clearFrame();
+
+  requestAnimationFrame(gameLoop);
+}
+
+// 启动
+init();
+</script>
+</body>
+</html>
