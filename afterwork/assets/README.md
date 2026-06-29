@@ -5,7 +5,7 @@ Default path convention for Plan 02. Put user-provided PNG files in this folder.
 Backgrounds should preferably be 320x180 PNG:
 - home_bg.png
 - balcony_bg.png
-- alley_bg.png
+- alley_bg.png (currently generated from the user's stairwell/style references)
 - bar_bg.png
 - yard_bg.png
 
