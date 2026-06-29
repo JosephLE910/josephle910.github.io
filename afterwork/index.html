@@ -1118,7 +1118,7 @@ const sceneHome = {
     { x: 100, y: 50, w: 25, h: 20, type: 'record', label: '唱片机' }
   ],
   exits: [
-    { x: 130, y: 145, w: 60, h: 25, target: 'alley', spawnX: 160, spawnY: 80 },
+    { x: 130, y: 145, w: 60, h: 25, target: 'alley', spawnX: 250, spawnY: 45 },
     { x: 150, y: 10, w: 40, h: 25, target: 'balcony', spawnX: 160, spawnY: 150 }
   ],
 
@@ -1452,48 +1452,23 @@ const sceneBalcony = {
   }
 };
 
-// 场景3：楼间（含一楼大厅和上楼楼梯）
+// 场景3：楼间（上方家门，下方酒吧门）
 const sceneAlley = {
   colliders: [
-    { x: 0, y: 0, w: 140, h: 25 },     // 上墙（左）
-    { x: 180, y: 0, w: 140, h: 25 },   // 上墙（右）
-    { x: 0, y: 0, w: 40, h: 180 },     // 左墙
-    { x: 280, y: 0, w: 40, h: 180 },   // 右墙
-    { x: 100, y: 40, w: 30, h: 5 },     // 上楼楼梯（出口上方）
-    { x: 190, y: 40, w: 30, h: 5 },     // 下楼楼梯（出口上方）
-    { x: 140, y: 160, w: 40, h: 5 }     // 酒吧门（出口上方）
+    { x: 0, y: 0, w: 18, h: 180 },      // 左墙
+    { x: 302, y: 0, w: 18, h: 180 },    // 右墙
+    { x: 0, y: 0, w: 240, h: 8 },       // 顶墙（家门留缺口）
+    { x: 286, y: 0, w: 34, h: 8 },      // 顶墙右段
+    { x: 0, y: 172, w: 240, h: 8 },     // 底墙（酒吧门留缺口）
+    { x: 286, y: 172, w: 34, h: 8 }     // 底墙右段
   ],
   exits: [
-    { x: 140, y: 0, w: 40, h: 25, target: 'home', spawnX: 160, spawnY: 80 },
-    { x: 190, y: 25, w: 30, h: 15, target: 'bar', spawnX: 160, spawnY: 80 },
-    { x: 140, y: 150, w: 40, h: 10, target: 'bar', spawnX: 160, spawnY: 80 }
+    { x: 246, y: 8, w: 44, h: 30, target: 'home', spawnX: 160, spawnY: 80 },
+    { x: 246, y: 140, w: 44, h: 32, target: 'bar', spawnX: 160, spawnY: 80 }
   ],
 
   drawArt() {
     if (!AssetLoader.draw('alley_bg', 0, 0, 320, 180)) return false;
-    AssetLoader.drawOrFallback('alley_stairs_up', 100, 30, 30, 12, () => {
-      ctx.fillStyle = COLORS.darkBrown;
-      ctx.fillRect(100, 30, 30, 10);
-      for (let i = 0; i < 5; i++) {
-        ctx.fillRect(100 + i * 6, 30 + i * 2, 6, 2);
-      }
-    });
-    AssetLoader.drawOrFallback('alley_stairs_down', 190, 30, 30, 12, () => {
-      ctx.fillStyle = COLORS.darkBrown;
-      ctx.fillRect(190, 30, 30, 10);
-      for (let i = 0; i < 5; i++) {
-        ctx.fillRect(190 + i * 6, 30 + i * 2, 6, 2);
-      }
-    });
-    AssetLoader.drawOrFallback('alley_bar_sign', 140, 135, 40, 30, () => {
-      ctx.fillStyle = COLORS.darkBrown;
-      ctx.fillRect(140, 145, 40, 20);
-      ctx.fillStyle = COLORS.red;
-      ctx.fillRect(145, 135, 30, 8);
-      ctx.fillStyle = COLORS.white;
-      ctx.font = '6px monospace';
-      ctx.fillText('BAR', 152, 141);
-    });
     return true;
   },
 
@@ -1503,73 +1478,98 @@ const sceneAlley = {
       return;
     }
 
-    // 墙壁
-    ctx.fillStyle = COLORS.gray;
+    // 楼梯间墙面
+    ctx.fillStyle = '#2f3145';
     ctx.fillRect(0, 0, 320, 180);
 
-    // 楼道地板
+    // 平台
     ctx.fillStyle = COLORS.floorColor;
-    ctx.fillRect(40, 30, 240, 150);
+    ctx.fillRect(24, 34, 238, 18);
+    ctx.fillRect(24, 82, 238, 18);
+    ctx.fillRect(24, 126, 238, 18);
+    ctx.fillRect(24, 160, 238, 12);
 
-    // 楼梯（上）
-    ctx.fillStyle = COLORS.darkBrown;
-    ctx.fillRect(100, 30, 30, 10);
-    for (let i = 0; i < 5; i++) {
-      ctx.fillRect(100 + i * 6, 30 + i * 2, 6, 2);
-    }
+    // 右侧门洞：最上面是家门，最下面是酒吧门
+    this.drawDoor(252, 10, 34, 28, '家');
+    this.drawDoor(252, 140, 34, 32, 'BAR');
 
-    // 楼梯（下）
-    ctx.fillStyle = COLORS.darkBrown;
-    ctx.fillRect(190, 30, 30, 10);
-    for (let i = 0; i < 5; i++) {
-      ctx.fillRect(190 + i * 6, 30 + i * 2, 6, 2);
-    }
+    // 折返楼梯，按用户草图从下往上连到家门
+    this.drawStairRun([
+      [55, 160], [75, 147], [98, 141], [124, 133], [152, 126], [232, 126]
+    ]);
+    this.drawStairRun([
+      [42, 126], [60, 112], [83, 102], [108, 94], [138, 88], [236, 88]
+    ]);
+    this.drawStairRun([
+      [44, 82], [64, 70], [86, 58], [113, 49], [145, 42], [236, 42]
+    ]);
 
-    // 门框
-    ctx.fillStyle = COLORS.darkBrown;
-    ctx.fillRect(140, 145, 40, 20);
-    ctx.fillStyle = COLORS.wood;
-    ctx.fillRect(145, 150, 30, 15);
-
-    // 酒吧标志
-    ctx.fillStyle = COLORS.red;
-    ctx.fillRect(145, 135, 30, 8);
-    ctx.fillStyle = COLORS.white;
-    ctx.font = '6px monospace';
-    ctx.fillText('BAR', 152, 141);
-
-    // 窗户
-    ctx.fillStyle = COLORS.nightSky;
-    ctx.fillRect(60, 60, 30, 40);
-    ctx.fillRect(230, 60, 30, 40);
-    ctx.strokeStyle = COLORS.white;
-    ctx.strokeRect(60, 60, 30, 40);
-    ctx.strokeRect(230, 60, 30, 40);
-
-    // 扶手
-    ctx.fillStyle = COLORS.lightGray;
-    ctx.fillRect(45, 40, 3, 130);
-    ctx.fillRect(272, 40, 3, 130);
+    // 扶手和平台边
+    ctx.strokeStyle = COLORS.lightGray;
+    ctx.lineWidth = 2;
+    [[24, 34, 248, 34], [24, 52, 238, 52], [24, 82, 248, 82], [24, 100, 238, 100], [24, 126, 248, 126], [24, 144, 238, 144], [24, 172, 248, 172]].forEach(line => {
+      ctx.beginPath();
+      ctx.moveTo(line[0], line[1]);
+      ctx.lineTo(line[2], line[3]);
+      ctx.stroke();
+    });
 
     // 提示
     this.drawHints();
   },
 
+  drawDoor(x, y, w, h, label) {
+    ctx.fillStyle = COLORS.darkBrown;
+    ctx.fillRect(x, y, w, h);
+    ctx.fillStyle = COLORS.wood;
+    ctx.fillRect(x + 4, y + 4, w - 8, h - 4);
+    ctx.fillStyle = COLORS.yellow;
+    ctx.fillRect(x + w - 8, y + Math.floor(h / 2), 2, 2);
+    ctx.fillStyle = COLORS.white;
+    ctx.font = '6px monospace';
+    ctx.fillText(label, x + 8, y + h - 6);
+  },
+
+  drawStairRun(points) {
+    ctx.strokeStyle = COLORS.darkBrown;
+    ctx.lineWidth = 8;
+    ctx.lineJoin = 'round';
+    ctx.beginPath();
+    points.forEach((point, i) => {
+      if (i === 0) ctx.moveTo(point[0], point[1]);
+      else ctx.lineTo(point[0], point[1]);
+    });
+    ctx.stroke();
+
+    ctx.strokeStyle = COLORS.lightWood;
+    ctx.lineWidth = 2;
+    points.forEach((point, i) => {
+      if (i === 0) return;
+      const prev = points[i - 1];
+      const steps = Math.max(2, Math.floor(Math.hypot(point[0] - prev[0], point[1] - prev[1]) / 9));
+      for (let s = 1; s < steps; s++) {
+        const t = s / steps;
+        const x = prev[0] + (point[0] - prev[0]) * t;
+        const y = prev[1] + (point[1] - prev[1]) * t;
+        ctx.beginPath();
+        ctx.moveTo(x - 4, y + 2);
+        ctx.lineTo(x + 4, y - 2);
+        ctx.stroke();
+      }
+    });
+    ctx.lineJoin = 'miter';
+  },
+
   drawHints() {
-    if (Player.y < 45 && Player.x < 130 && Player.x > 95) {
+    if (Player.x > 230 && Player.y < 55) {
       ctx.fillStyle = COLORS.yellow;
       ctx.font = '8px monospace';
-      ctx.fillText('上楼回家', 95, 20);
+      ctx.fillText('回家', 242, 48);
     }
-    if (Player.y < 45 && Player.x < 220 && Player.x > 185) {
+    if (Player.x > 230 && Player.y > 126) {
       ctx.fillStyle = COLORS.yellow;
       ctx.font = '8px monospace';
-      ctx.fillText('下楼到一楼', 185, 20);
-    }
-    if (Player.y > 145 && Player.x < 180 && Player.x > 135) {
-      ctx.fillStyle = COLORS.yellow;
-      ctx.font = '8px monospace';
-      ctx.fillText('进酒吧', 145, 145);
+      ctx.fillText('进酒吧', 236, 136);
     }
   },
 
@@ -1603,7 +1603,7 @@ const sceneBar = {
     { x: 240, y: 120, w: 30, h: 30 }    // 桌子2
   ],
   exits: [
-    { x: 130, y: 155, w: 60, h: 15, target: 'alley', spawnX: 160, spawnY: 80 },
+    { x: 130, y: 155, w: 60, h: 15, target: 'alley', spawnX: 250, spawnY: 132 },
     { x: 290, y: 80, w: 15, h: 30, target: 'yard', spawnX: 50, spawnY: 90 }
   ],
   npcs: [
