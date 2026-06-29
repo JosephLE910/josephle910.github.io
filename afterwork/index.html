@@ -84,6 +84,7 @@
 <body>
 <div id="gameContainer">
   <canvas id="gameCanvas" width="320" height="180"></canvas>
+  <div id="debugState" hidden></div>
   <div id="touchControls">
     <div id="dpad">
       <div class="touch-btn up" data-key="ArrowUp">↑</div>
@@ -129,6 +130,142 @@ const COLORS = {
   floorColor: '#4a4a4a',
   carpet: '#8b0000'
 };
+
+const ASSET_DEFINITIONS = [
+  { name: 'loader_probe', src: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAYAAABytg0kAAAAFklEQVR42mP8z8Dwn4GBgYGJgYGBgQEAFSoDfiCBQj8AAAAASUVORK5CYII=', required: true },
+  { name: 'home_bg', src: 'assets/home_bg.png' },
+  { name: 'home_bed', src: 'assets/home_bed.png' },
+  { name: 'home_desk', src: 'assets/home_desk.png' },
+  { name: 'home_record', src: 'assets/home_record.png' },
+  { name: 'home_door', src: 'assets/home_door.png' },
+  { name: 'balcony_bg', src: 'assets/balcony_bg.png' },
+  { name: 'balcony_aquarium', src: 'assets/balcony_aquarium.png' },
+  { name: 'balcony_plant', src: 'assets/balcony_plant.png' },
+  { name: 'balcony_door', src: 'assets/balcony_door.png' },
+  { name: 'alley_bg', src: 'assets/alley_bg.png' },
+  { name: 'alley_stairs_up', src: 'assets/alley_stairs_up.png' },
+  { name: 'alley_stairs_down', src: 'assets/alley_stairs_down.png' },
+  { name: 'alley_bar_sign', src: 'assets/alley_bar_sign.png' },
+  { name: 'bar_bg', src: 'assets/bar_bg.png' },
+  { name: 'bar_counter', src: 'assets/bar_counter.png' },
+  { name: 'bar_shelf', src: 'assets/bar_shelf.png' },
+  { name: 'bar_table', src: 'assets/bar_table.png' },
+  { name: 'bar_bartender', src: 'assets/bar_bartender.png' },
+  { name: 'bar_customer', src: 'assets/bar_customer.png' },
+  { name: 'bar_door', src: 'assets/bar_door.png' },
+  { name: 'yard_bg', src: 'assets/yard_bg.png' },
+  { name: 'yard_bench', src: 'assets/yard_bench.png' },
+  { name: 'yard_oldchen', src: 'assets/yard_oldchen.png' },
+  { name: 'yard_ashtray', src: 'assets/yard_ashtray.png' },
+  { name: 'yard_door', src: 'assets/yard_door.png' },
+  { name: 'player_walk', src: 'assets/player_walk.png', sprite: { frameW: 12, frameH: 16, directions: ['down', 'left', 'right', 'up'], frames: 2 } },
+  { name: 'player_down', src: 'assets/player_down.png' },
+  { name: 'player_left', src: 'assets/player_left.png' },
+  { name: 'player_right', src: 'assets/player_right.png' },
+  { name: 'player_up', src: 'assets/player_up.png' }
+];
+
+const AssetLoader = {
+  images: {},
+  meta: {},
+  loaded: 0,
+  failed: 0,
+  total: 0,
+  ready: false,
+  started: false,
+
+  loadAll(definitions, onComplete) {
+    this.started = true;
+    this.ready = false;
+    this.loaded = 0;
+    this.failed = 0;
+    this.total = definitions.length;
+    definitions.forEach(def => {
+      this.meta[def.name] = def;
+      const img = new Image();
+      img.onload = () => this.finish(def.name, img, true, onComplete);
+      img.onerror = () => this.finish(def.name, img, false, onComplete);
+      img.src = def.src;
+      this.images[def.name] = { img, ok: false, done: false, src: def.src };
+    });
+  },
+
+  finish(name, img, ok, onComplete) {
+    const entry = this.images[name];
+    if (!entry || entry.done) return;
+    entry.done = true;
+    entry.ok = ok;
+    if (ok) {
+      this.loaded++;
+      DebugLog.add('ASSET', `loaded ${name} ${img.naturalWidth}x${img.naturalHeight}`);
+    } else {
+      this.failed++;
+      DebugLog.add('ASSET', `fallback ${name} src=${entry.src}`);
+    }
+    if (this.loaded + this.failed >= this.total) {
+      this.ready = true;
+      DebugLog.add('ASSET', `ready loaded=${this.loaded} failed=${this.failed}`);
+      onComplete();
+    }
+  },
+
+  has(name) {
+    const entry = this.images[name];
+    return !!(entry && entry.ok && entry.img.complete && entry.img.naturalWidth > 0);
+  },
+
+  draw(name, x, y, w, h) {
+    if (!this.has(name)) return false;
+    const img = this.images[name].img;
+    ctx.drawImage(img, Math.floor(x), Math.floor(y), Math.floor(w), Math.floor(h));
+    return true;
+  },
+
+  drawOrFallback(name, x, y, w, h, fallback) {
+    if (this.draw(name, x, y, w, h)) return true;
+    fallback();
+    return false;
+  },
+
+  drawPlayer(player) {
+    const x = Math.floor(player.x);
+    const y = Math.floor(player.y);
+    const sheet = this.meta.player_walk && this.meta.player_walk.sprite;
+    if (sheet && this.has('player_walk')) {
+      const img = this.images.player_walk.img;
+      const dirIndex = Math.max(0, sheet.directions.indexOf(player.direction));
+      const availableFrames = Math.max(1, Math.floor(img.naturalWidth / sheet.frameW));
+      const frame = player.isMoving ? player.animFrame % Math.min(sheet.frames, availableFrames) : 0;
+      const sx = frame * sheet.frameW;
+      const sy = Math.min(dirIndex, Math.floor(img.naturalHeight / sheet.frameH) - 1) * sheet.frameH;
+      ctx.drawImage(img, sx, sy, sheet.frameW, sheet.frameH, x, y, player.width, player.height);
+      return true;
+    }
+    return this.draw(`player_${player.direction}`, x, y, player.width, player.height);
+  },
+
+  statusText() {
+    if (!this.started) return '准备载入资源...';
+    return `载入美术 ${this.loaded}/${this.total}，降级 ${this.failed}`;
+  }
+};
+
+function drawLoadingScreen() {
+  ctx.clearRect(0, 0, 320, 180);
+  ctx.fillStyle = COLORS.darkBlue;
+  ctx.fillRect(0, 0, 320, 180);
+  ctx.fillStyle = COLORS.white;
+  ctx.font = '10px monospace';
+  ctx.fillText('下班后', 142, 70);
+  ctx.font = '8px monospace';
+  ctx.fillText(AssetLoader.statusText(), 95, 92);
+  ctx.fillStyle = COLORS.gray;
+  ctx.fillRect(90, 104, 140, 8);
+  const progress = AssetLoader.total ? (AssetLoader.loaded + AssetLoader.failed) / AssetLoader.total : 0;
+  ctx.fillStyle = COLORS.green;
+  ctx.fillRect(90, 104, Math.floor(140 * progress), 8);
+  AssetLoader.draw('loader_probe', 154, 120, 12, 12);
+}
 
 // ==================== 音频系统 ====================
 const AudioSystem = {
@@ -235,6 +372,24 @@ const Input = {
   keys: {},
   justPressed: {},
   touchActive: {},
+  virtualPressCount: 0,
+  lastVirtualKey: '',
+
+  pressVirtualKey(key) {
+    if (!this.keys[key]) {
+      this.justPressed[key] = true;
+    }
+    this.keys[key] = true;
+    this.touchActive[key] = true;
+    this.virtualPressCount++;
+    this.lastVirtualKey = key;
+    AudioSystem.resume();
+  },
+
+  releaseVirtualKey(key) {
+    this.keys[key] = false;
+    this.touchActive[key] = false;
+  },
 
   init() {
     document.addEventListener('keydown', (e) => {
@@ -252,20 +407,23 @@ const Input = {
     // 触屏控制
     document.querySelectorAll('.touch-btn').forEach(btn => {
       const key = btn.dataset.key;
-      btn.addEventListener('touchstart', (e) => {
+      const start = (e) => {
         e.preventDefault();
-        if (!this.keys[key]) {
-          this.justPressed[key] = true;
-        }
-        this.keys[key] = true;
-        this.touchActive[key] = true;
-        AudioSystem.resume();
-      });
-      btn.addEventListener('touchend', (e) => {
+        this.pressVirtualKey(key);
+      };
+      const end = (e) => {
         e.preventDefault();
-        this.keys[key] = false;
-        this.touchActive[key] = false;
-      });
+        this.releaseVirtualKey(key);
+      };
+      btn.addEventListener('touchstart', start);
+      btn.addEventListener('touchend', end);
+      btn.addEventListener('touchcancel', end);
+      btn.addEventListener('pointerdown', start);
+      btn.addEventListener('pointerup', end);
+      btn.addEventListener('pointercancel', end);
+      btn.addEventListener('mousedown', start);
+      btn.addEventListener('mouseup', end);
+      btn.addEventListener('mouseleave', end);
     });
 
     // 点击互动
@@ -418,6 +576,7 @@ const Player = {
   draw() {
     const x = Math.floor(this.x);
     const y = Math.floor(this.y);
+    if (AssetLoader.drawPlayer(this)) return;
 
     // 身体
     ctx.fillStyle = COLORS.blue;
@@ -963,7 +1122,43 @@ const sceneHome = {
     { x: 150, y: 10, w: 40, h: 25, target: 'balcony', spawnX: 160, spawnY: 150 }
   ],
 
+  drawArt() {
+    if (!AssetLoader.draw('home_bg', 0, 0, 320, 180)) return false;
+    AssetLoader.drawOrFallback('home_bed', 40, 50, 40, 25, () => {
+      ctx.fillStyle = COLORS.brown;
+      ctx.fillRect(40, 50, 40, 25);
+      ctx.fillStyle = COLORS.white;
+      ctx.fillRect(42, 52, 36, 20);
+    });
+    AssetLoader.drawOrFallback('home_desk', 240, 50, 30, 30, () => {
+      ctx.fillStyle = COLORS.darkBrown;
+      ctx.fillRect(240, 50, 30, 30);
+      ctx.fillStyle = COLORS.lightWood;
+      ctx.fillRect(242, 52, 26, 26);
+    });
+    AssetLoader.drawOrFallback('home_record', 100, 50, 25, 20, () => {
+      ctx.fillStyle = COLORS.black;
+      ctx.fillRect(100, 50, 25, 20);
+      ctx.fillStyle = COLORS.gray;
+      ctx.fillRect(102, 52, 21, 16);
+      ctx.fillStyle = COLORS.red;
+      ctx.fillRect(111, 59, 3, 3);
+    });
+    AssetLoader.drawOrFallback('home_door', 145, 160, 30, 20, () => {
+      ctx.fillStyle = COLORS.darkBrown;
+      ctx.fillRect(145, 160, 30, 20);
+      ctx.fillStyle = COLORS.yellow;
+      ctx.fillRect(168, 170, 3, 3);
+    });
+    return true;
+  },
+
   draw() {
+    if (this.drawArt()) {
+      this.drawInteractHints();
+      return;
+    }
+
     // 地板
     ctx.fillStyle = COLORS.wood;
     ctx.fillRect(0, 0, 320, 180);
@@ -1098,7 +1293,43 @@ const sceneBalcony = {
   ],
   plantWatered: false,
 
+  drawArt() {
+    if (!AssetLoader.draw('balcony_bg', 0, 0, 320, 180)) return false;
+    AssetLoader.drawOrFallback('balcony_aquarium', 50, 60, 30, 25, () => {
+      ctx.fillStyle = 'rgba(100, 200, 255, 0.3)';
+      ctx.fillRect(50, 60, 30, 25);
+      ctx.strokeStyle = COLORS.white;
+      ctx.lineWidth = 1;
+      ctx.strokeRect(50, 60, 30, 25);
+    });
+    this.fish.forEach(fish => {
+      ctx.fillStyle = COLORS.orange;
+      ctx.fillRect(fish.x, fish.y, 4, 2);
+      ctx.fillRect(fish.x + (fish.dir > 0 ? 4 : -2), fish.y, 2, 2);
+    });
+    AssetLoader.drawOrFallback('balcony_plant', 240, 70, 22, 23, () => {
+      ctx.fillStyle = COLORS.brown;
+      ctx.fillRect(242, 85, 16, 8);
+      ctx.fillStyle = this.plantWatered ? COLORS.green : '#556b2f';
+      ctx.fillRect(245, 70, 10, 15);
+      ctx.fillRect(240, 75, 6, 8);
+      ctx.fillRect(254, 75, 6, 8);
+    });
+    AssetLoader.drawOrFallback('balcony_door', 35, 155, 30, 25, () => {
+      ctx.fillStyle = COLORS.darkBrown;
+      ctx.fillRect(35, 155, 30, 25);
+      ctx.fillStyle = COLORS.yellow;
+      ctx.fillRect(58, 168, 3, 3);
+    });
+    return true;
+  },
+
   draw() {
+    if (this.drawArt()) {
+      this.drawHints();
+      return;
+    }
+
     // 夜空背景
     ctx.fillStyle = COLORS.nightSky;
     ctx.fillRect(0, 0, 320, 180);
@@ -1238,7 +1469,40 @@ const sceneAlley = {
     { x: 140, y: 150, w: 40, h: 10, target: 'bar', spawnX: 160, spawnY: 80 }
   ],
 
+  drawArt() {
+    if (!AssetLoader.draw('alley_bg', 0, 0, 320, 180)) return false;
+    AssetLoader.drawOrFallback('alley_stairs_up', 100, 30, 30, 12, () => {
+      ctx.fillStyle = COLORS.darkBrown;
+      ctx.fillRect(100, 30, 30, 10);
+      for (let i = 0; i < 5; i++) {
+        ctx.fillRect(100 + i * 6, 30 + i * 2, 6, 2);
+      }
+    });
+    AssetLoader.drawOrFallback('alley_stairs_down', 190, 30, 30, 12, () => {
+      ctx.fillStyle = COLORS.darkBrown;
+      ctx.fillRect(190, 30, 30, 10);
+      for (let i = 0; i < 5; i++) {
+        ctx.fillRect(190 + i * 6, 30 + i * 2, 6, 2);
+      }
+    });
+    AssetLoader.drawOrFallback('alley_bar_sign', 140, 135, 40, 30, () => {
+      ctx.fillStyle = COLORS.darkBrown;
+      ctx.fillRect(140, 145, 40, 20);
+      ctx.fillStyle = COLORS.red;
+      ctx.fillRect(145, 135, 30, 8);
+      ctx.fillStyle = COLORS.white;
+      ctx.font = '6px monospace';
+      ctx.fillText('BAR', 152, 141);
+    });
+    return true;
+  },
+
   draw() {
+    if (this.drawArt()) {
+      this.drawHints();
+      return;
+    }
+
     // 墙壁
     ctx.fillStyle = COLORS.gray;
     ctx.fillRect(0, 0, 320, 180);
@@ -1347,7 +1611,60 @@ const sceneBar = {
     { x: 210, y: 90, type: 'customer', name: '客人' }
   ],
 
+  drawArt() {
+    if (!AssetLoader.draw('bar_bg', 0, 0, 320, 180)) return false;
+    AssetLoader.drawOrFallback('bar_counter', 40, 50, 80, 20, () => {
+      ctx.fillStyle = COLORS.wood;
+      ctx.fillRect(40, 50, 80, 20);
+      ctx.fillStyle = COLORS.lightWood;
+      ctx.fillRect(40, 50, 80, 5);
+    });
+    AssetLoader.drawOrFallback('bar_shelf', 45, 20, 70, 25, () => {
+      ctx.fillStyle = COLORS.darkBrown;
+      ctx.fillRect(45, 20, 70, 25);
+      const bottleColors = [COLORS.red, COLORS.green, COLORS.blue, COLORS.yellow, COLORS.orange];
+      for (let i = 0; i < 5; i++) {
+        ctx.fillStyle = bottleColors[i];
+        ctx.fillRect(50 + i * 12, 25, 6, 15);
+        ctx.fillStyle = COLORS.white;
+        ctx.fillRect(50 + i * 12, 25, 6, 3);
+      }
+    });
+    AssetLoader.drawOrFallback('bar_bartender', 58, 48, 10, 17, () => {
+      ctx.fillStyle = COLORS.white;
+      ctx.fillRect(58, 55, 8, 10);
+      ctx.fillStyle = COLORS.skin;
+      ctx.fillRect(59, 50, 6, 5);
+      ctx.fillStyle = COLORS.black;
+      ctx.fillRect(59, 48, 6, 2);
+    });
+    AssetLoader.drawOrFallback('bar_table', 200, 80, 30, 30, () => {
+      ctx.fillStyle = COLORS.brown;
+      ctx.fillRect(200, 80, 30, 30);
+    });
+    AssetLoader.drawOrFallback('bar_table', 240, 120, 30, 30, () => {
+      ctx.fillStyle = COLORS.brown;
+      ctx.fillRect(240, 120, 30, 30);
+    });
+    AssetLoader.drawOrFallback('bar_customer', 210, 80, 10, 15, () => {
+      ctx.fillStyle = COLORS.green;
+      ctx.fillRect(210, 85, 8, 10);
+      ctx.fillStyle = COLORS.skin;
+      ctx.fillRect(211, 80, 6, 5);
+    });
+    AssetLoader.drawOrFallback('bar_door', 292, 80, 10, 30, () => {
+      ctx.fillStyle = COLORS.darkBrown;
+      ctx.fillRect(292, 80, 10, 30);
+    });
+    return true;
+  },
+
   draw() {
+    if (this.drawArt()) {
+      this.drawHints();
+      return;
+    }
+
     // 地板
     ctx.fillStyle = COLORS.darkBrown;
     ctx.fillRect(0, 0, 320, 180);
@@ -1541,7 +1858,47 @@ const sceneYard = {
   currentNode: 'start',
   choiceSelection: 0,
 
+  drawArt() {
+    if (!AssetLoader.draw('yard_bg', 0, 0, 320, 180)) return false;
+    AssetLoader.drawOrFallback('yard_bench', 100, 70, 40, 25, () => {
+      ctx.fillStyle = COLORS.brown;
+      ctx.fillRect(100, 75, 40, 5);
+      ctx.fillRect(102, 80, 3, 15);
+      ctx.fillRect(135, 80, 3, 15);
+      ctx.fillRect(100, 70, 40, 3);
+    });
+    AssetLoader.drawOrFallback('yard_oldchen', 113, 68, 14, 18, () => {
+      ctx.fillStyle = COLORS.darkBlue;
+      ctx.fillRect(113, 75, 8, 10);
+      ctx.fillStyle = COLORS.skin;
+      ctx.fillRect(114, 70, 6, 5);
+      ctx.fillStyle = COLORS.gray;
+      ctx.fillRect(114, 68, 6, 2);
+    });
+    ctx.fillStyle = COLORS.white;
+    ctx.fillRect(122, 72, 4, 1);
+    ctx.fillStyle = 'rgba(200, 200, 200, 0.5)';
+    ctx.fillRect(126, 70, 3, 3);
+    ctx.fillRect(129, 68, 2, 2);
+    AssetLoader.drawOrFallback('yard_ashtray', 200, 105, 20, 10, () => {
+      ctx.fillStyle = COLORS.gray;
+      ctx.fillRect(200, 105, 20, 10);
+      ctx.fillStyle = COLORS.darkBrown;
+      ctx.fillRect(202, 107, 16, 6);
+    });
+    AssetLoader.drawOrFallback('yard_door', 32, 80, 15, 30, () => {
+      ctx.fillStyle = COLORS.darkBrown;
+      ctx.fillRect(32, 80, 15, 30);
+    });
+    return true;
+  },
+
   draw() {
+    if (this.drawArt()) {
+      this.drawHints();
+      return;
+    }
+
     // 夜空
     ctx.fillStyle = COLORS.nightSky;
     ctx.fillRect(0, 0, 320, 180);
@@ -1663,6 +2020,49 @@ const sceneYard = {
 };
 
 // ==================== 初始化 ====================
+let gameStarted = false;
+
+window.AfterWorkDebug = {
+  getState() {
+    return {
+      gameStarted,
+      assetReady: AssetLoader.ready,
+      loaded: AssetLoader.loaded,
+      failed: AssetLoader.failed,
+      total: AssetLoader.total,
+      currentScene: SceneManager.currentScene,
+      player: { x: Player.x, y: Player.y, direction: Player.direction },
+      dialogueActive: DialogueSystem.active,
+      minigameActive: MiniGame.active,
+      touch: { virtualPressCount: Input.virtualPressCount, lastVirtualKey: Input.lastVirtualKey },
+      imageRendering: getComputedStyle(canvas).imageRendering,
+      debugTail: DebugLog.lines.slice(-12)
+    };
+  }
+};
+
+function getDebugState() {
+  return window.AfterWorkDebug.getState();
+}
+
+function publishDebugState() {
+  const el = document.getElementById('debugState');
+  if (el) {
+    el.textContent = JSON.stringify(getDebugState());
+  }
+}
+
+function getDebugStart() {
+  const params = new URLSearchParams(window.location.search);
+  const scene = params.get('debugScene');
+  if (!scene || !SceneManager.scenes[scene]) return null;
+  return {
+    scene,
+    x: Number(params.get('debugX') || 160),
+    y: Number(params.get('debugY') || 120)
+  };
+}
+
 function init() {
   AudioSystem.init();
   Input.init();
@@ -1681,18 +2081,35 @@ function init() {
     }
   };
 
-  // 加载存档
-  const save = SaveSystem.load();
+  // 加载存档；debugScene 只用于自动验收指定起点
+  const debugStart = getDebugStart();
+  const save = debugStart || SaveSystem.load();
   if (save && save.scene) {
     SceneManager.currentScene = save.scene;
     Player.reset(save.x || 160, save.y || 120);
   }
+
+  AssetLoader.loadAll(ASSET_DEFINITIONS, startGame);
+  loadingLoop();
+}
+
+function startGame() {
+  if (gameStarted) return;
+  gameStarted = true;
 
   // 开始环境音
   setTimeout(() => AudioSystem.playAmbient(), 1000);
 
   // 开始游戏循环
   gameLoop();
+}
+
+function loadingLoop() {
+  drawLoadingScreen();
+  publishDebugState();
+  if (!AssetLoader.ready) {
+    requestAnimationFrame(loadingLoop);
+  }
 }
 
 // ==================== 游戏循环 ====================
@@ -1728,6 +2145,7 @@ function gameLoop() {
 
   // Debug overlay (§DEBUG-9 + §WEB-1)
   DebugLog.draw();
+  publishDebugState();
 
   // 清除输入状态
   Input.clearFrame();
