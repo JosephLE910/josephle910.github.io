@@ -82,13 +82,36 @@
   #dpad .right { grid-column: 3; grid-row: 2; }
   #dpad .down { grid-column: 2; grid-row: 3; }
   #actionBtn {
-    width: 70px;
-    height: 70px;
-    border-radius: 50%;
-    font-size: 16px;
+    width: 86px;
+    height: 58px;
+    border-radius: 0;
+    clip-path: polygon(8px 0, calc(100% - 8px) 0, 100% 8px, 100% calc(100% - 8px), calc(100% - 8px) 100%, 8px 100%, 0 calc(100% - 8px), 0 8px);
+    font-size: 14px;
+    font-weight: bold;
+    letter-spacing: 0;
     align-self: center;
-    background: radial-gradient(circle at 35% 30%, rgba(255, 211, 132, 0.95), rgba(178, 76, 65, 0.96) 58%, rgba(88, 32, 40, 0.98));
-    border-color: rgba(255, 225, 171, 0.58);
+    color: #ffe6a8;
+    background:
+      linear-gradient(90deg, transparent 0 8px, #ffd37a 8px calc(100% - 8px), transparent calc(100% - 8px)),
+      linear-gradient(90deg, transparent 0 4px, #9e3e3f 4px calc(100% - 4px), transparent calc(100% - 4px));
+    border: 0;
+    text-shadow: 2px 2px 0 #5a1f2d;
+    box-shadow:
+      0 0 0 4px #3b1825,
+      4px 4px 0 #090b14,
+      inset 4px 4px 0 #f08d5b,
+      inset -4px -4px 0 #632535;
+  }
+  #actionBtn:active {
+    transform: translate(3px, 3px);
+    background:
+      linear-gradient(90deg, transparent 0 8px, #f3b95d 8px calc(100% - 8px), transparent calc(100% - 8px)),
+      linear-gradient(90deg, transparent 0 4px, #7d3038 4px calc(100% - 4px), transparent calc(100% - 4px));
+    box-shadow:
+      0 0 0 4px #3b1825,
+      1px 1px 0 #090b14,
+      inset 2px 2px 0 #bf6849,
+      inset -2px -2px 0 #4f1d2a;
   }
   @media (max-width: 700px) {
     body {
