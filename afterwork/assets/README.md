@@ -2,12 +2,12 @@
 
 Default path convention for Plan 02. Put user-provided PNG files in this folder.
 
-Backgrounds should preferably be 320x180 PNG:
-- home_bg.png
-- balcony_bg.png
+Backgrounds are 320x180 PNG in the current generated set:
+- home_bg.png (generated)
+- balcony_bg.png (generated)
 - alley_bg.png (currently generated from the user's stairwell/style references)
-- bar_bg.png
-- yard_bg.png
+- bar_bg.png (generated)
+- yard_bg.png (generated)
 
 Player:
 - player_walk.png: sprite sheet, rows `down,left,right,up`, 12x16 per frame, 2 frames per row.
