@@ -2,12 +2,12 @@
 
 Default path convention for Plan 02. Put user-provided PNG files in this folder.
 
-Backgrounds are 320x180 PNG in the current generated set:
-- home_bg.png (generated)
-- balcony_bg.png (generated)
-- alley_bg.png (currently generated from the user's stairwell/style references)
-- bar_bg.png (generated shell layer: wall, floor, doors, fixed wall decor only)
-- yard_bg.png (generated)
+Backgrounds are 320x180 PNG shell layers in the current generated set:
+- home_bg.png (wall, floor, rug, window, door opening)
+- balcony_bg.png (skyline, floor, railing, fixed doorway)
+- alley_bg.png (stairwell platforms, stairs, railings)
+- bar_bg.png (wall, floor, doors, fixed wall decor only)
+- yard_bg.png (sky, wall, ground, fixed doorway)
 
 Player:
 - player_walk.png: sprite sheet, rows `down,left,right,up`, 21x31 per frame, 2 frames per row.
