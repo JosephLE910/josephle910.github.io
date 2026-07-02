@@ -64,3 +64,5 @@ jobs:
         uses: actions/deploy-pages@v4
         with:
           timeout: 1800000
+          error_count: 100
+          reporting_interval: 10000
