@@ -674,14 +674,24 @@ const Player = {
   checkCollision(x, y) {
     const scene = SceneManager.getCurrentScene();
     if (!scene || !scene.colliders) return false;
+    const hitbox = this.getCollisionBox(x, y);
     for (const col of scene.colliders) {
-      if (x < col.x + col.w && x + this.width > col.x &&
-          y < col.y + col.h && y + this.height > col.y) {
-        DebugLog.add('COL', `hit(${col.x},${col.y},${col.w}x${col.h}) at P(${Math.floor(x)},${Math.floor(y)})`);
+      if (hitbox.x < col.x + col.w && hitbox.x + hitbox.w > col.x &&
+          hitbox.y < col.y + col.h && hitbox.y + hitbox.h > col.y) {
+        DebugLog.add('COL', `hit(${col.x},${col.y},${col.w}x${col.h}) at P(${Math.floor(x)},${Math.floor(y)}) foot(${Math.floor(hitbox.x)},${Math.floor(hitbox.y)},${hitbox.w}x${hitbox.h})`);
         return true;
       }
     }
     return false;
+  },
+
+  getCollisionBox(x = this.x, y = this.y) {
+    return {
+      x: x + 5,
+      y: y + this.height - 9,
+      w: this.width - 10,
+      h: 7
+    };
   },
 
   draw() {
@@ -1219,7 +1229,7 @@ const sceneHome = {
   ],
   exits: [
     { x: 130, y: 145, w: 60, h: 25, target: 'alley', spawnX: 250, spawnY: 45 },
-    { x: 150, y: 10, w: 40, h: 25, target: 'balcony', spawnX: 160, spawnY: 150 }
+    { x: 150, y: 10, w: 40, h: 25, target: 'balcony', spawnX: 160, spawnY: 130 }
   ],
 
   drawArt() {
@@ -1375,7 +1385,6 @@ const sceneBalcony = {
     { x: 0, y: 0, w: 20, h: 150 },      // 左墙上段（出口在下方）
     { x: 0, y: 165, w: 20, h: 15 },     // 左墙下段
     { x: 290, y: 0, w: 30, h: 180 },    // 右墙
-    { x: 75, y: 165, w: 245, h: 15 },   // 下墙（门在左侧）
     { x: 42, y: 56, w: 54, h: 36 },     // 鱼缸
     { x: 236, y: 60, w: 34, h: 38 }     // 盆栽
   ],
@@ -2145,6 +2154,9 @@ function normalizeSpawn(save) {
   const next = { ...save };
   if (next.scene === 'home' && next.x > 130 && next.x < 190 && next.y > 112) {
     next.y = 100;
+  }
+  if (next.scene === 'balcony' && next.y > 138) {
+    next.y = 130;
   }
   return next;
 }
