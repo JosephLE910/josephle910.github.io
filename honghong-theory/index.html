@@ -1,0 +1,1273 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>泓泓理论拓扑阅读图谱</title>
+  <style>
+    :root {
+      --paper: #f8f7f2;
+      --ink: #232323;
+      --muted: #6d6a63;
+      --line: #d6d0c3;
+      --panel: #ffffff;
+      --red: #d94b45;
+      --amber: #d28b26;
+      --green: #3c8d73;
+      --blue: #3979b8;
+      --violet: #765fa8;
+      --shadow: 0 14px 36px rgba(40, 36, 30, 0.11);
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html,
+    body {
+      margin: 0;
+      min-height: 100%;
+      background: var(--paper);
+      color: var(--ink);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC",
+        "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+      letter-spacing: 0;
+    }
+
+    body {
+      padding: 22px;
+    }
+
+    .shell {
+      max-width: 1440px;
+      margin: 0 auto;
+      display: grid;
+      grid-template-columns: minmax(720px, 1fr) 360px;
+      gap: 18px;
+      align-items: start;
+    }
+
+    header {
+      grid-column: 1 / -1;
+      display: flex;
+      align-items: end;
+      justify-content: space-between;
+      gap: 18px;
+      border-bottom: 1px solid var(--line);
+      padding-bottom: 14px;
+    }
+
+    h1 {
+      margin: 0 0 7px;
+      font-size: 26px;
+      line-height: 1.2;
+      font-weight: 760;
+    }
+
+    .site-title {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: baseline;
+      gap: 10px;
+    }
+
+    .site-slogan {
+      color: #38342e;
+      font-size: 16px;
+      font-style: italic;
+      font-weight: 400;
+    }
+
+    .subtitle {
+      margin: 0;
+      color: var(--muted);
+      font-size: 14px;
+      line-height: 1.65;
+    }
+
+    .controls {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: flex-end;
+      gap: 8px;
+      min-width: 260px;
+    }
+
+    button {
+      border: 1px solid var(--line);
+      background: #fffdf8;
+      color: var(--ink);
+      min-height: 36px;
+      padding: 0 12px;
+      border-radius: 6px;
+      font: inherit;
+      font-size: 13px;
+      cursor: pointer;
+    }
+
+    button:hover,
+    button.is-active {
+      border-color: var(--ink);
+      background: #fff;
+    }
+
+    .map-wrap,
+    .side-panel,
+    .guide-panel {
+      background: rgba(255, 255, 255, 0.7);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      box-shadow: var(--shadow);
+    }
+
+    .map-wrap {
+      position: relative;
+      min-height: 780px;
+      overflow: auto;
+    }
+
+    .map {
+      position: relative;
+      min-width: 1040px;
+      height: 780px;
+    }
+
+    .layer-band {
+      position: absolute;
+      left: 18px;
+      right: 18px;
+      border: 1px solid rgba(35, 35, 35, 0.08);
+      border-radius: 8px;
+      background: rgba(255, 255, 255, 0.38);
+      pointer-events: none;
+    }
+
+    .band-l1 {
+      top: 22px;
+      height: 150px;
+    }
+
+    .band-l2 {
+      top: 206px;
+      height: 150px;
+    }
+
+    .band-l3 {
+      top: 392px;
+      height: 348px;
+    }
+
+    .layer-title {
+      position: absolute;
+      left: 34px;
+      padding: 2px 7px;
+      border-radius: 4px;
+      background: var(--paper);
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 700;
+      pointer-events: none;
+    }
+
+    .title-l1 {
+      top: 13px;
+    }
+
+    .title-l2 {
+      top: 197px;
+    }
+
+    .title-l3 {
+      top: 383px;
+    }
+
+    svg.edges {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
+      overflow: visible;
+    }
+
+    .edge {
+      stroke: rgba(35, 35, 35, 0.28);
+      stroke-width: 1.7;
+      fill: none;
+      transition: stroke 140ms ease, stroke-width 140ms ease, opacity 140ms ease;
+    }
+
+    .edge.is-prereq {
+      stroke: var(--red);
+      stroke-width: 2.8;
+      opacity: 1;
+    }
+
+    .edge.is-dependent {
+      stroke: var(--blue);
+      stroke-width: 2.4;
+      opacity: 1;
+    }
+
+    .edge.is-dim {
+      opacity: 0.12;
+    }
+
+    .edge.is-same-layer {
+      stroke-dasharray: 5 5;
+    }
+
+    .node {
+      position: absolute;
+      width: 142px;
+      min-height: 64px;
+      border: 2px solid var(--line);
+      border-radius: 8px;
+      background: #fffdf8;
+      padding: 10px 11px;
+      cursor: pointer;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      gap: 5px;
+      transition: transform 140ms ease, border-color 140ms ease,
+        box-shadow 140ms ease, opacity 140ms ease;
+      z-index: 2;
+    }
+
+    .node:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 8px 18px rgba(40, 36, 30, 0.13);
+    }
+
+    .node strong {
+      display: block;
+      font-size: 17px;
+      line-height: 1.2;
+      font-weight: 760;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .node span {
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.35;
+    }
+
+    .node.is-selected {
+      border-color: var(--red);
+      box-shadow: 0 0 0 4px rgba(217, 75, 69, 0.14), var(--shadow);
+      z-index: 3;
+    }
+
+    .node.is-prereq {
+      border-color: var(--red);
+    }
+
+    .node.is-dependent {
+      border-color: var(--blue);
+    }
+
+    .node.is-dim {
+      opacity: 0.28;
+    }
+
+    .node.l1 {
+      border-color: rgba(217, 75, 69, 0.6);
+    }
+
+    .node.l2 {
+      border-color: rgba(60, 141, 115, 0.6);
+    }
+
+    .node.l3 {
+      border-color: rgba(57, 121, 184, 0.38);
+    }
+
+    .side {
+      display: grid;
+      gap: 18px;
+    }
+
+    .side-panel,
+    .guide-panel {
+      padding: 16px;
+    }
+
+    .panel-kicker {
+      margin: 0 0 5px;
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 700;
+    }
+
+    h2 {
+      margin: 0 0 10px;
+      font-size: 21px;
+      line-height: 1.25;
+    }
+
+    .detail-heading {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: baseline;
+      gap: 8px;
+    }
+
+    .detail-slogan {
+      color: #38342e;
+      font-size: 16px;
+      font-style: italic;
+      font-weight: 400;
+    }
+
+    .detail-slogan[hidden] {
+      display: none;
+    }
+
+    .meta {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      margin: 0 0 14px;
+    }
+
+    .pill {
+      display: inline-flex;
+      align-items: center;
+      min-height: 24px;
+      padding: 0 8px;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      background: #fff;
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    .detail-text {
+      margin: 0 0 16px;
+      color: #38342e;
+      font-size: 14px;
+      line-height: 1.72;
+      white-space: pre-line;
+    }
+
+    .use-case {
+      margin: 0 0 16px;
+      padding: 11px 12px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: rgba(255, 253, 248, 0.82);
+    }
+
+    .use-case[hidden] {
+      display: none;
+    }
+
+    .use-case-title {
+      margin: 0 0 5px;
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 760;
+    }
+
+    .use-case-text {
+      margin: 0;
+      color: #38342e;
+      font-size: 14px;
+      line-height: 1.62;
+    }
+
+    .key-points {
+      margin: 0 0 16px;
+      padding: 0 0 0 1.1em;
+      list-style: none;
+      border-left: 3px solid rgba(60, 141, 115, 0.62);
+    }
+
+    .key-points[hidden] {
+      display: none;
+    }
+
+    .key-points li {
+      margin: 0 0 7px;
+      padding: 0 0 0 7px;
+      color: #38342e;
+      font-size: 13px;
+      line-height: 1.55;
+    }
+
+    .key-points li::before {
+      content: "·";
+      margin-right: 7px;
+      color: #38342e;
+    }
+
+    .rel-title {
+      margin: 14px 0 7px;
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 760;
+    }
+
+    .rel-list {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      margin: 0;
+      padding: 0;
+      list-style: none;
+    }
+
+    .rel-list button {
+      min-height: 28px;
+      padding: 0 9px;
+      font-size: 12px;
+    }
+
+    .guide-text {
+      margin: 0 0 13px;
+      color: #38342e;
+      font-size: 14px;
+      line-height: 1.72;
+    }
+
+    .starter-list {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+      font-size: 13px;
+      margin: 0 0 16px;
+      padding: 0;
+      list-style: none;
+    }
+
+    .starter-list button {
+      width: 100%;
+      min-height: 40px;
+      text-align: left;
+    }
+
+    .path-list {
+      display: grid;
+      gap: 8px;
+      margin: 0;
+      padding: 0;
+      list-style: none;
+    }
+
+    .path-list button {
+      width: 100%;
+      min-height: 38px;
+      text-align: left;
+      line-height: 1.35;
+    }
+
+    .node.is-starter {
+      border-color: var(--amber);
+      box-shadow: 0 0 0 4px rgba(210, 139, 38, 0.15);
+    }
+
+    .legend {
+      grid-column: 1 / -1;
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 10px;
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.55;
+    }
+
+    .legend-item {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: rgba(255, 255, 255, 0.62);
+      padding: 11px 12px;
+    }
+
+    .legend b {
+      color: var(--ink);
+    }
+
+    @media (max-width: 1120px) {
+      body {
+        padding: 14px;
+      }
+
+      .shell {
+        grid-template-columns: 1fr;
+      }
+
+      header {
+        align-items: start;
+        flex-direction: column;
+      }
+
+      .controls {
+        justify-content: flex-start;
+      }
+
+      .legend {
+        grid-template-columns: 1fr 1fr;
+      }
+    }
+
+    @media (max-width: 680px) {
+      .legend {
+        grid-template-columns: 1fr;
+      }
+
+      h1 {
+        font-size: 22px;
+      }
+
+      .map-wrap {
+        min-height: 680px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main class="shell">
+    <header>
+      <div>
+        <div class="site-title">
+          <h1>泓泓理论拓扑阅读图谱</h1>
+          <span class="site-slogan">——“欢迎来到地球Online”</span>
+        </div>
+        <p class="subtitle">先读五个入口概念，再按兴趣自由跳读。箭头表示阅读依赖：A 指向 B，意思是理解 B 前最好先理解 A。</p>
+      </div>
+      <div class="controls" aria-label="图谱控制">
+        <button type="button" id="showAll">全部显示</button>
+        <button type="button" id="showOrder">标出五个入口</button>
+        <button type="button" id="selectRoot">从发心开始</button>
+      </div>
+    </header>
+
+    <section class="map-wrap" aria-label="泓泓理论图谱">
+      <div class="map" id="map">
+        <div class="layer-band band-l1"></div>
+        <div class="layer-band band-l2"></div>
+        <div class="layer-band band-l3"></div>
+        <div class="layer-title title-l1">第一层：最高原则</div>
+        <div class="layer-title title-l2">第二层：从行动经验中抽象出的发心面向</div>
+        <div class="layer-title title-l3">第三层：多来源概念节点</div>
+        <svg class="edges" id="edges" viewBox="0 0 1040 780" aria-hidden="true">
+          <defs>
+            <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+              <path d="M 0 0 L 10 5 L 0 10 z" fill="rgba(35, 35, 35, 0.36)"></path>
+            </marker>
+            <marker id="arrowRed" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+              <path d="M 0 0 L 10 5 L 0 10 z" fill="#d94b45"></path>
+            </marker>
+            <marker id="arrowBlue" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+              <path d="M 0 0 L 10 5 L 0 10 z" fill="#3979b8"></path>
+            </marker>
+          </defs>
+        </svg>
+      </div>
+    </section>
+
+    <aside class="side">
+      <section class="side-panel" aria-label="节点说明">
+        <p class="panel-kicker">当前节点</p>
+        <h2 class="detail-heading">
+          <span id="detailTitle">发心</span>
+          <span class="detail-slogan" id="detailSlogan" hidden></span>
+        </h2>
+        <div class="meta" id="detailMeta"></div>
+        <div class="use-case" id="useCaseBox" hidden>
+          <p class="use-case-title">能处理的具体情况</p>
+          <p class="use-case-text" id="useCaseText"></p>
+        </div>
+        <p class="rel-title" id="keyPointsTitle" hidden>要点</p>
+        <ul class="key-points" id="keyPointsList" hidden></ul>
+        <p class="detail-text" id="detailText"></p>
+        <p class="rel-title">前置节点</p>
+        <ul class="rel-list" id="prereqList"></ul>
+        <p class="rel-title">后续节点</p>
+        <ul class="rel-list" id="dependentList"></ul>
+      </section>
+
+      <section class="guide-panel" aria-label="阅读引导">
+        <p class="panel-kicker">阅读入口</p>
+        <h2>先看五个</h2>
+        <p class="guide-text">第一次看不要从整张图开始。先把五个基础概念读顺：发心、行动、体验、向上、共进。它们够了，剩下的节点可以按兴趣进入。</p>
+        <ul class="starter-list" id="starterList"></ul>
+        <p class="rel-title">按兴趣自由阅读</p>
+        <ul class="path-list" id="pathList"></ul>
+      </section>
+    </aside>
+
+    <section class="legend" aria-label="图例">
+      <div class="legend-item"><b>第一层</b>：只有发心、行动。发心提供人生内容；行动提供现实化原则。</div>
+      <div class="legend-item"><b>第二层</b>：只有体验、向上、共进。它们是发心展开出的三个生命面向。</div>
+      <div class="legend-item"><b>第三层</b>：概念节点可以有多个前置来源，不再强行归到单一章节。</div>
+      <div class="legend-item"><b>反馈关系</b>：不画成主箭头，避免破坏拓扑阅读；可写进每个节点页。</div>
+    </section>
+  </main>
+
+  <script>
+    const nodes = [
+      {
+        id: "heart",
+        name: "发心",
+        layer: 1,
+        x: 305,
+        y: 64,
+        slogan: "——“你不必踌躇，你走你的路，做你的主——《避世离俗》”",
+        note: "发心是“我真的想要的”。\n\n发心要和工具区分开。目标设定、计划、框架、效率方法、人生模型等等，都只是工具。它们只能服务发心，不能替代发心。\n\n发心之外，一切都是手段，百无禁忌。\n\n发心不明，行动和工具都会空转。\n\n发心需要被辨认。外界认可、形式化目标、宏大叙事等等都是工具或规训，都可能让自己以为“我想要”。而真正的发心，常常通过在行动中产生的沉浸感、获得感、不满足感、对某些生活状态的拒绝等体验，慢慢显现出来。\n\n根据泓泓的经验，寻找、辨认发心要有做到以下两点：\n（1）相信自己的感受并对自己诚实：喜欢就是喜欢，不喜欢就是不喜欢。不管外界怎么说，一定要让自己站在自己这边。在没有逼迫的情况下反复问自己，“我是不是真的想要这个？”，如果能给出比较肯定、比较没有犹豫的回答，那么它应该就是发心。\n（2）持续地行动，对行动的过程和成果要认真感受，如果可以的话可以把类似的行动的感受进行总结。特别是迷茫的时候，干点什么并在干的过程中获得一些感受作为判断材料，比空想好。\n\n对泓泓理论来说，体验、向上、共进是我从自己的行动经验中抽象出的、发心的三个主要面向，而不是自顶向下推演出来的。每个人的发心面向都是不同的。",
+        tags: ["第一层", "根"]
+      },
+      {
+        id: "action",
+        name: "行动",
+        layer: 1,
+        x: 590,
+        y: 64,
+        slogan: "——“成为行动派：先干了再说”",
+        note: "伟人公式 = 发心 + 密集行动 + 反省迭代。\n\n行动是发心进入现实的唯一途径，也是找到发心的唯一途径。先有发心还是先有行动？我认为是先有行动，有了行动才有对于发心来说至关重要的感性材料。所以，行动是可以与发心并列的。\n\n行动不是等到完全想清楚才开始，而是先进入现实。它不追求一次做对，而是在快速迭代中逐渐接近有效做法。人往往不是先拥有完整认识，再开始行动；而是在行动中接触现实、获得经验、形成认识，再用新的行动检验和修正认识。行动不是反对思考，而是反对脱离实践的空转思考。\n\n行动需要去形式化，思维要专注于推进行动本身。行动不是为了证明自己有多努力、多强大，也不是为了符合某种正确的姿态；它的唯一目的就是让发心进入现实。只要能推进真实的问题，行动就不必拘泥于形式。越少意志力、精力消耗，越能自然发生，越好。卡住、失败、反复，都只是行动中的情况，不是对人下的定论。",
+        tags: ["第一层", "实现原则"]
+      },
+      {
+        id: "experience",
+        name: "体验",
+        layer: 2,
+        x: 205,
+        y: 248,
+        slogan: "——“成为体验派：体验是目标，也是重要的工具”",
+        keyPoints: [
+          "体验不是附属品，它本身就是生活要追求的内容。",
+          "体验会提供判断材料，提示自己真正想要什么、不要什么。",
+          "体验要反过来调整行动，让行动更值得经历、更能持续。"
+        ],
+        note: "体验是我从自己的行动经验中抽象出的、发心的一个主要面向。想让人生过得更畅快、更过瘾。\n\n体验首先是目标。人生不只有结果、身份、效率等等，也包括过程本身如何被我感受。每天不只是目标的垫脚石，当下的舒适感、沉浸感、平静感等感受，都构成生活本身的内容。因此，体验要参与决策：一件事是否值得做，不能只看结果，也要看它会让我过一段怎样的生活。需要牺牲的体验，也要作为成本考虑。\n\n体验也用于判断。体验不是被动地追求舒服，而是重视自己的真实感受，并让这种感受参与判断。什么让我有获得感，什么让我空耗，什么让我沉浸，什么让我不满足，都会帮助我判断一件事是否值得做。负面体验也有信息：焦虑、愤怒、被淘汰感，不只是需要被消除的情绪，也可能让我看见自己在乎什么、卡在哪里、需要怎样调整。发心也常常通过体验显现出来：反复出现的获得感、不满足、愿望和拒绝，会逐渐让我看见自己真正想要什么。\n\n综上，体验能用于优化行动。同一件事可以有不同做法，而不同做法会带来不同体验。体验可以提示我如何调整节奏、降低空耗、增强反馈感，让行动更自然、更可持续，也更贴近发心。",
+        tags: ["第二层", "经验抽象"]
+      },
+      {
+        id: "upward",
+        name: "向上",
+        layer: 2,
+        x: 449,
+        y: 248,
+        slogan: "——“无限进化”",
+        keyPoints: [
+          "向上不是一种状态，而是不断推进的问题序列。",
+          "真正的向上要指向关键成果，而不是证明自己很努力、很能吃苦。",
+          "没有明确关键成果时，维持平衡比强行吃苦更高效。",
+          "向上要面向未来：过去提供根基，但可能性要从未来找。"
+        ],
+        note: "向上是我从自己的行动经验中抽象出的、发心的一个主要面向。它来源于对挑战感的追求——有挑战，才是有趣的。\n\n向上不是一种状态，而是不断推进的问题序列。不存在一个叫“我想变强”的可执行目标；真正的向上，是在发心指引下持续解决具体问题，并通过这些问题的解决，让人生发生真实进展。\n\n向上必须指向关键成果。真正把人生带到下一阶段的，通常不是每一点苦、每一次局部得失，而是少数关键成果。向上如果不落到关键成果，就容易变成“我在努力”“我在吃苦”的自我形象维护。\n\n向上也包括平衡。无明确追求的关键成果时，维持平衡比强行吃苦更舒服也更高效，可以让自己恢复精气神，为下一次追求准备；过分忙碌、失去平衡、为个人英雄主义吃苦，反而会让向上变成空耗，带来阶段性的崩溃，甚至导致自我攻击。\n\n向上需要面向未来。过去能提供根基、经验和立足点，但机会、可能性、发展方向要从未来找。向上意味着不能用过去框住自己，而要看见自己还能做什么、还能可能走到哪里。这需要一点想象。",
+        tags: ["第二层", "经验抽象"]
+      },
+      {
+        id: "together",
+        name: "共进",
+        layer: 2,
+        x: 692,
+        y: 248,
+        slogan: "——“相信别人”",
+        keyPoints: [
+          "相信别人的痛苦、经验和处境。",
+          "从“我”的视角扩展到“我们”的视角。",
+          "在竞争与合作中理解自己。"
+        ],
+        note: "共进是我从自己的行动经验中抽象出的、发心的一个主要面向。我希望我的朋友们也过得好。\n\n共进强调：人生不是只有“我如何变好”，也包括我如何和他人一起往前走。发心进入真实生活后，一定会遇到他人的感受、处境、痛苦、利益和评价标准。\n\n共进首先是相信别人。相信别人的痛苦和经验是真实的，是自己可能没有面对过的；不能因为我能做到，就默认别人也应该做到。这是对“只相信自己”的修正。\n\n共进也要求把视角从“我”扩展到“我们”。在亲密关系和合作关系里，要从两个人或多个人的角度思考，给到对方必要的预期，考虑自己的行动如何影响别人。\n\n共进还包括在世界坐标中理解自己。比较和竞争的焦点，不是战胜别人，而是收集信息、明确位置、看见自己在更大系统中的处境。竞争的对象本质上是一个抽象的群体（比如一个有什么技术层级的群体），而不是其他具体的人本身。",
+        tags: ["第二层", "经验抽象"]
+      },
+      {
+        id: "gain",
+        name: "获得感",
+        layer: 3,
+        x: 228,
+        y: 430,
+        slogan: "——“为什么利用意志力的时候，总是会破功？因为意志力没有被用在刀刃上”",
+        keyPoints: [
+          "获得感是对行动成果的主观量化标准。",
+          "获得感用于事前预估和事后复盘，帮助判断什么值得做。",
+          "获得感要同时看成果和成本，避免盲目消耗意志力和精力。",
+          "获得感不是追求体验完整性，除非过程本身就是我要获得的东西。"
+        ],
+        note: "获得感，是体验用于判断行动成果的一种主观量化标准。\n\n做一件事之前，可以先预估：这件事如果做成，会给我多强的获得感？它是否会带来能力积累、时间释放、创作成果、被认可等我真正想要的？做完之后，再复盘：实际获得感是否和预估一致？如果不一致，差在哪里？从而在下一轮循环中，获得对值不值得做更好的判断。\n\n获得感的作用，是帮助我判断什么值得做、怎么做更划算。很多愤怒和内耗，来自“亏了”的感觉：花了很多时间，却没有学到很多有用的东西，也没有得到成就感。反过来，如果一件事虽然很难，但能带来明确收获，就更容易持续。\n\n具体来说，获得感也能帮助自己避免盲目消耗意志力和精力。意志力和精力应该用在能产生真实获得感的地方，而不是用来感动自己。做事时要同时看成果和成本：什么结果会让我觉得“赚到”？为了这个结果，需要付出多少时间、精力和情绪成本？值不值得？\n\n获得感不是追求体验完整性。除非过程本身就是我要获得的东西，否则没有必要为了原创、硬刚、亲自踩坑而保留完整体验。很多时候，结果优先于过程的完整和漂亮；捷径、复用、提高效率，如果能让我获得时间，去做更多真正想做的事，也是在提高获得感。",
+        tags: ["第三层", "体验", "向上"]
+      },
+      {
+        id: "rhythm",
+        name: "节奏",
+        layer: 3,
+        x: 398,
+        y: 430,
+        useCase: "避免硬撑、透支和计划崩盘；在状态波动中维持持续行动；打持久战",
+        slogan: "——“事已至此，先吃饭吧”",
+        keyPoints: [
+          "节奏处理的是如何持续行动，而不是靠硬撑行动。",
+          "节奏来自对身体、情绪和状态信号的信任。",
+          "好节奏让正反馈和努力程度匹配，使行动更可持续。",
+          "节奏的目标，是降低对意志力的依赖。"
+        ],
+        note: "节奏处理的是：如何持续行动，而不是靠硬撑行动。\n\n节奏来自有招论和体验的结合。有招论让我相信自己休息后会回到行动，体验让我重视身体、情绪和状态发出的信号。所以节奏不是放纵自己，而是相信自己的感觉，判断什么时候该推进、什么时候该停。\n\n节奏反对硬撑。硬撑往往是回报和努力程度不匹配时的坚持，容易变成形式主义和自我感动。舒服的努力节奏，不是不努力，而是让正反馈和努力程度匹配，让行动更可持续。\n\n节奏也要求计划不要建立在理想状态上。按“我今天只有 60% 状态”来设计计划，能跑起来的计划才是好计划；跑不了的计划，本身就是错误计划。\n\n节奏的目标，是降低对意志力的依赖。行动不应该总靠燃烧状态推进，而应该顺着身体信号、反馈强度和现实精力来调整，让自己长期还能回到行动里。",
+        tags: ["第三层", "体验", "行动"]
+      },
+      {
+        id: "has_move",
+        name: "有招论",
+        layer: 3,
+        x: 738,
+        y: 430,
+        useCase: "在不确定中保持行动，减少面对未知的恐惧和焦虑。",
+        slogan: "——“别怕，与之一战！”",
+        keyPoints: [
+          "有招的根本来源，是事物具有两面性。",
+          "招来自持续的行动，需要在行动中长出来。",
+          "有招的信念来自多次从没招到有招的实践过程。",
+          "与未知共存，带着不确定继续行动。"
+        ],
+        note: "面对未知的时候，相信会有招的。\n\n有招论的根本来源，是事物具有两面性。一个糟糕的情况里，往往也有可以被利用的一面；所谓“有招”，不是保证一切都会完美解决，而是相信现实中值得继续寻找可用之处。\n\n有招论是面对未知时的自信心法。当自己暂时不知道怎么办时，它让我不急着在门口焦虑，而是先假设现实中有可用之处，然后真正进入现实、继续行动，让招在过程中逐渐长出来。\n\n有招的信念也来自实践。过去很多问题，都是在行动中逐渐出现办法的。每一次进入未知、有招出现、问题解决的循环，都会让自信飞轮——“我相信会有招的，因为经历过多次从没招到有招的实践过程”的信念——转得更稳；自信增强后，自己也更敢进入更深的未知。\n\n在冷启动、还没有自信的时候，有招论还需要共存来点火：先别停，带着不确定继续走。走下去，才会有招出现，飞轮才转得起来。",
+        tags: ["第三层", "行动", "自信"]
+      },
+      {
+        id: "key_result",
+        name: "关键成果",
+        layer: 3,
+        x: 58,
+        y: 550,
+        slogan: "——“成果会自己说话”",
+        keyPoints: [
+          "关键成果是能让人生发生质变的成果。",
+          "不是指向关键成果的苦不用吃。"
+        ],
+        note: "关键成果，是能让人生发生质变的成果。\n\n人生的进展并不取决于每一份苦、每一次努力、每一个局部得失。真正把人带到下一阶段的，往往是少数关键成果：跨考成功、拿到 offer、做出能被真实认可的作品、形成能改变现实处境的能力或资产。关键成果的标准，不是让我显得努力，而是它是否真的改变了我在现实中的位置。\n\n所以，向上必须指向关键成果。设置目标时，要先问：我要获得的关键成果是什么？它能不能提高我现实处境的下限？不能指向关键成果的苦不必吃；不能提高关键成果概率的努力，很可能只是在维持“我很努力、我很能忍”的自我形象。\n\n关键成果观也会重新解释过去。它不否认过去的努力和痛苦，但会祛魅“每一份苦都有必要”。人生主要是被少数关键成果带过来的，很多局部得失没有想象中那么重要。更重要的是承认真正起作用的路径，放下对每段苦的辩护，不再用局部成败判定整个人生。",
+        tags: ["第三层", "向上", "行动"]
+      },
+      {
+        id: "main_conflict",
+        name: "抓大放小",
+        layer: 3,
+        x: 228,
+        y: 550,
+        slogan: "——“拿得定，见得透”",
+        keyPoints: [
+          "抓大放小包含两个动作：抓住主要矛盾，舍弃次要矛盾。",
+          "抓大，是找到当前局面的承重点；放小，是让次要问题不占用行动中心。",
+          "如果只有次要矛盾，就去找次要矛盾中的主要矛盾。"
+        ],
+        note: "从辩证法的角度来说，就是推进让主要矛盾克服次要矛盾的过程。\n\n抓大放小，是一种让行动重新启动的问题处理方式。它包含两个动作：抓住主要矛盾，舍弃次要矛盾。\n\n人在行动中卡住，常常不是因为每个细节都没想清楚，而是因为真正承重的问题还没有显形。所谓“抓大”，就是找出当前局面里最牵动整体的问题：哪个问题一旦被看清、被决定，其他问题就会跟着定下来。所谓“放小”，不是否认次要问题存在，而是在当前阶段不让它们继续占用决策和行动的中心。\n\n现实里不一定总有一个显眼的主要矛盾。有时眼前“全是次要矛盾”，没有哪个问题看起来足够“关键”。这时不是停下，而是深入分析：去把握次要矛盾中的主要矛盾。也就是说，在当前能处理的范围里，继续找最牵动局部结构的那个点。\n\n当规划或决策卡住时，可以先画出现实的客观约束，再明确自己的发心，然后在二者交集中寻找承重决策。承重决策一旦定下来，很多原子动作会被自然逼出来。\n\n所以，抓大放小不是为了追求完美分析，而是为了让行动重新启动。看清当前层级的主要矛盾，同时愿意舍弃当前阶段的次要矛盾，混乱才会显出结构，事情才会继续往前走。",
+        tags: ["第三层", "行动", "向上"]
+      },
+      {
+        id: "break_build",
+        name: "不破不立",
+        layer: 3,
+        x: 398,
+        y: 550,
+        slogan: "——“作出舍弃，才意味着作出选择”",
+        keyPoints: [
+          "破，是作出舍弃，停止在旧结构里缝缝补补。",
+          "立，是先让新方向站住，并相信自己能处理破之后的问题。",
+          "不破不立要求执行理性决策的魄力：该舍的舍，该破的破，该定的定。"
+        ],
+        note: "不破不立处理的是：在已经看见更好的方向时，能不能破掉旧结构，让新的方向成立。\n\n破，是停止在旧结构里缝缝补补。很多时候，人不是完全不知道该怎么做，而是不敢真的试、不敢真的改、不敢舍弃已经投入过的路径，于是反复撤销、局部微调、提前反驳，最后行动停在原地。破，就是承认旧方式已经挡住了下一步，必须大刀阔斧地改。\n\n立，不是一次性把新东西建完，而是先让新方向站住。创作时可以先固定基础结构，选择时可以先定下主线，尝试时可以先给自己一个可接受的兜底。然后相信自己能处理破之后暴露出来的问题，相信面对新情况会有招。立的关键不是“已经完美”，而是新结构已经可以承接后续行动。\n\n不破不立也意味着真正的选择。选择不是把所有可能性都保住，而是为了让主线成立，愿意舍弃次要目标、旧路径和局部优化。一个阶段只能有一个战略主线，其余目标要么降维为附着目标，要么被牺牲。\n\n所以，不破不立不是激烈姿态，而是执行理性决策的魄力：该舍的舍，该破的破，该定的定。",
+        tags: ["第三层", "向上", "行动"]
+      },
+      {
+        id: "quantum",
+        name: "量变质变",
+        layer: 3,
+        x: 568,
+        y: 550,
+        slogan: "——“不是非黑即白，占比才决定了性质”",
+        keyPoints: [
+          "很多事情不是非黑即白，而是由占比决定性质。",
+          "看清所处阶段，才能判断方向、建立信心。",
+          "量变积累到一定程度，才会进入新的阶段。",
+          "局部还有问题，不等于整体失败。"
+        ],
+        note: "量变质变处理的是：不要用非黑即白的方式理解事物，而要用占比、阶段和积累来看问题。这个量如何定很关键。泓泓认为，可以先用主观量化来定：自己感觉是多少的占比。再在具体行动中调整。\n\n很多事情不是“有/没有”“成/没成”“强/不强”的二分。一个人可以总体大方，但局部自私；一件事可以还没做成，但已经产生阶段性认识；一个需求可以现在还存在，但它可能只是某个阶段的功能。用占比来看，就不会因为局部问题否定整体，也不会因为还没到终点就觉得没有进展。\n\n量变质变也用于理解成长。向上不是一种状态，而是不断推进的问题序列。每一次具体问题的解决、每一次面对未知后增长的信心、每一次阶段性目标的完成，都可能只是量变；但量变积累到一定程度，就会让人进入新的阶段。\n\n阶段性认识很重要。比如“证明自己”可能不是永久需求，而是某个阶段用来积累面对未知的信心的东西。关键不是立刻消灭它，也不是永远困在里面，而是知道自己正处在这个阶段，并观察它是否在推动自己走向下一阶段。\n\n所以，量变质变不是抽象辩证法，而是一种行动中的认识工具。它让人看见比例、阶段和积累：现在还没质变，不等于没有进展；局部还有问题，也不等于整体失败。",
+        tags: ["第三层", "向上", "认识工具"]
+      },
+      {
+        id: "balance",
+        name: "平衡与向上",
+        layer: 3,
+        x: 738,
+        y: 550,
+        useCase: "在没有明确关键成果时避免强行吃苦；为日常维护预留精力，防止向上变成透支。",
+        slogan: "——“记得清兵线。”",
+        keyPoints: [
+          "平衡也需要精力。",
+          "日常维护是基本功。",
+          "没有明确关键成果时，维持平衡比强行吃苦更高效。",
+          "平衡是向上的底盘，不是向上的反面。"
+        ],
+        note: "平衡与向上主要处理的是：在向上的过程中，如何看待平衡。\n\n整理、洗碗、休息、恢复、维持日常秩序，看起来不像“进步”，但它们会消耗真实的时间和能量，所以必须为平衡预留资源。\n\n维持平衡的事务，不必被看成苦差、牺牲或额外负担，而可以被看作普通人的 baseline。把它降格成基本功，抗拒感会减少，也更容易不假思索地完成。\n\n向上如果不指向关键成果，就容易变成“我在努力”“我在吃苦”的形式化自我证明。无明确关键成果时，维持平衡比强行吃苦更诚实。\n\n真正的向上不能摧毁生活底盘；真正的平衡也不是停滞，而是给关键成果、持续行动和长期复利保留余地。",
+        tags: ["第三层", "向上", "平衡"]
+      },
+      {
+        id: "coexist",
+        name: "共存",
+        layer: 3,
+        x: 142,
+        y: 670,
+        slogan: "——“莫听穿林打叶声，何妨吟啸且徐行。”",
+        keyPoints: [
+          "有些事存在极限，当前无法被消除或更进一步。",
+          "分不清“走不通”还是“还没到”时，不必强行判断。",
+          "共存不是停下，而是带着无法解决的部分继续行动。"
+        ],
+        note: "共存的根本来源，是极限定律：有些事物存在极限，在当前条件下没办法更进一步。\n\n人会遇到很多暂时无法消除的东西：矛盾、冲突、混乱、不确定、阶段限制、关系张力，以及“我现在判断不出来”的状态。共存不是逃避，也不是认输，而是承认现实中确实存在一些当前无法解决、无法判断、无法推进的部分。\n\n共存的关键，是承认它存在，不加剧也不回避，把精力放回真正的发心。面对不可消除的矛盾，不急着抹除；面对暂时看不清的混乱，不急着把一切理顺；面对分不清“走不通”还是“还没到”的状态，不必强行判断，把它降级成背景，继续行动。\n\n共存也是冷启动时的行动方式。在还没有自信、还没有招、还看不到关键进展的时候，不需要先说服自己“一定可以”，只需要先别停。带着不确定继续行动，实践才会发生；有了实践，才可能出现转机、主次和招。\n\n所以，共存不是消极忍受，而是在不能立刻解决一切时，聚焦能行动的部分。它让人带着矛盾、不确定和极限继续行动，把精力放回真正的发心和仍然可以解决的问题。",
+        tags: ["第三层", "行动", "共存"]
+      },
+      {
+        id: "third_person",
+        name: "第三者",
+        layer: 3,
+        x: 312,
+        y: 670,
+        useCase: "让自己与自己相处时更少内耗，减少负罪感；意识到主观能动性能发挥更大的作用。",
+        slogan: "——“今日方知我是我”",
+        keyPoints: [
+          "第三者的视角，是把世界划分成外部环境、内部环境和真我。",
+          "小我是环境化的我，即内部环境，会影响我，但不等于真我。",
+          "真正的主体性在第三者这里，只体现在我能控制的部分。",
+          "把小我也看作环境，可以减少自责和内耗，并扩大主观能动性的作用对象。"
+        ],
+        note: "第三者的视角，是把世界划分成外部环境、内部环境和真我。这里的内部环境，指下文所说那些在我身上、但并不是由我主动塑造的部分；这里的真我，指第三者。使用第三者的说法，是为了强调作为观察者的视角。\n\n第三者来自对“顺势”的进一步思考：如果环境会推动我走向某个位置，达到局部平衡，而构成“我”的身体、性格、思想、经历、际遇等也会影响我最终流向哪里，那么“我”本身也是环境的一部分。\n\n上面的“我”，即道家所说的“无我”中的“我”，指的是由身体、性格、思想、经历、际遇等组成的环境化的“我”，也就是小我。小我之所以不是真我，是因为它的很多部分并不是我主动选择成为的，而是由我所处的自然环境、社会环境塑造出来的。它影响我，也构成我所处的现实条件，但它不等于真正能做主的真我。能够观察外部环境和内部环境的觉察者，才是第三者，也就是真我。\n\n第三者重新安放了主体性。真正的主体性不在小我那里，而在第三者这里，因为主体性只体现在我能控制的部分：如何观察、如何回应、持什么态度、下一步如何行动。至于结果、际遇、成败、他人评价，属于命运和环境，顺势放手。\n\n第三者的作用，不只是抽离自我，而是把自我也纳入可观察、可设计、可改造的环境。因为把“我”看作环境的一部分，主观能动性能作用的对象就扩大了：我不只是在外部环境里行动，也可以通过调整自身的解释方式、行动结构和反应模式来改造内部环境（即小我）。同时，小我作为环境的一部分并不完全可控，也会真实影响我的行动，因此不必把这些影响变成自责和内耗，而是把它们当成现实条件来处理。",
+        tags: ["第三层", "发心", "行动"]
+      },
+      {
+        id: "automation",
+        name: "自动化",
+        layer: 3,
+        x: 482,
+        y: 670,
+        slogan: "——“想要改变吗？那么就应该去改变你的环境。——《意志力陷阱》”",
+        keyPoints: [
+          "自动化的核心，是把好的行为外包给结构。",
+          "结构包括环境和流程。",
+          "环境包括物质环境、人际环境和时间节奏。",
+          "流程化能把做过的事变成下次可复用的程序。"
+        ],
+        note: "自动化，是通过设计结构，让好的行动更自然地发生。\n\n它不是单指技术工具，也不是把人变成机器，而是把一部分行动压力从意志力转移到环境、流程上。比如在适合学习的地方更容易学习，和信息质量高的人相处更容易判断准确，把做过的事情流程化后，下次就不必重新摸索。\n\n自动化的核心，是降低行动对状态的依赖。状态会波动，意志力也会消耗；如果每一次行动都要靠临场燃烧，行动就很难持续。好的结构会让正确的事更顺手，让错误的事更费劲，把“我要逼自己做”变成“事情自然往那里走”。\n\n自动化也包括流程化思考。做过的事要沉淀成流程，明确每一步怎么走、适用于什么情况。这样掌握的就不只是单个知识点，而是一套可以复用的连招。\n\n所以，自动化不是偷懒，而是理性地降低行动损耗。它让意志力从持续推进中解放出来，只用于少数真正需要守住边界的地方。",
+        tags: ["第三层", "行动", "环境"]
+      },
+    ];
+
+    const edges = [
+      ["heart", "experience"],
+      ["heart", "upward"],
+      ["heart", "together"],
+
+      ["experience", "gain"],
+      ["upward", "gain"],
+
+      ["experience", "rhythm"],
+      ["action", "rhythm"],
+      ["has_move", "rhythm"],
+
+      ["action", "has_move"],
+
+      ["upward", "key_result"],
+      ["action", "key_result"],
+
+      ["action", "main_conflict"],
+      ["upward", "main_conflict"],
+
+      ["main_conflict", "break_build"],
+      ["has_move", "break_build"],
+      ["upward", "break_build"],
+      ["action", "break_build"],
+
+      ["upward", "quantum"],
+      ["experience", "quantum"],
+      ["action", "quantum"],
+
+      ["upward", "balance"],
+      ["experience", "balance"],
+
+      ["experience", "coexist"],
+
+      ["heart", "third_person"],
+      ["action", "third_person"],
+
+      ["action", "automation"],
+      ["experience", "automation"],
+      ["upward", "automation"]
+    ];
+
+    const nodeById = new Map(nodes.map((node) => [node.id, node]));
+    const incoming = new Map(nodes.map((node) => [node.id, []]));
+    const outgoing = new Map(nodes.map((node) => [node.id, []]));
+
+    for (const [from, to] of edges) {
+      incoming.get(to).push(from);
+      outgoing.get(from).push(to);
+    }
+
+    const mapEl = document.getElementById("map");
+    const svgEl = document.getElementById("edges");
+    const detailTitle = document.getElementById("detailTitle");
+    const detailSlogan = document.getElementById("detailSlogan");
+    const detailMeta = document.getElementById("detailMeta");
+    const detailText = document.getElementById("detailText");
+    const useCaseBox = document.getElementById("useCaseBox");
+    const useCaseText = document.getElementById("useCaseText");
+    const keyPointsTitle = document.getElementById("keyPointsTitle");
+    const keyPointsList = document.getElementById("keyPointsList");
+    const prereqList = document.getElementById("prereqList");
+    const dependentList = document.getElementById("dependentList");
+    const starterList = document.getElementById("starterList");
+    const pathList = document.getElementById("pathList");
+    const starterIds = ["heart", "action", "experience", "upward", "together"];
+    const interestPaths = [
+      {
+        label: "想知道自己到底为什么做",
+        ids: ["heart", "experience", "gain"]
+      },
+      {
+        label: "想把事情真的推进",
+        ids: ["action", "has_move", "main_conflict", "break_build"]
+      },
+      {
+        label: "想判断苦值不值得吃",
+        ids: ["upward", "key_result", "quantum", "balance"]
+      },
+      {
+        label: "想让过程更舒服、更可持续",
+        ids: ["experience", "rhythm", "automation"]
+      },
+      {
+        label: "想处理关系、冲突和环境",
+        ids: ["together", "coexist"]
+      },
+      {
+        label: "想处理自我和主体性",
+        ids: ["heart", "action", "third_person", "automation"]
+      }
+    ];
+
+    function makeNode(node) {
+      const el = document.createElement("button");
+      el.type = "button";
+      el.className = `node l${node.layer}`;
+      el.dataset.id = node.id;
+      el.style.left = `${node.x}px`;
+      el.style.top = `${node.y}px`;
+      el.innerHTML = `<strong>${node.name}</strong><span>${node.tags.slice(0, 2).join(" · ")}</span>`;
+      el.addEventListener("click", () => selectNode(node.id));
+      mapEl.appendChild(el);
+    }
+
+    function pointFor(id, direction) {
+      const node = nodeById.get(id);
+      const width = 142;
+      const height = 64;
+      if (direction === "out") {
+        return { x: node.x + width / 2, y: node.y + height };
+      }
+      return { x: node.x + width / 2, y: node.y };
+    }
+
+    function sameLayerPath(from, to) {
+      const fromNode = nodeById.get(from);
+      const toNode = nodeById.get(to);
+      const width = 142;
+      const height = 64;
+      const goingRight = fromNode.x < toNode.x;
+      const start = {
+        x: goingRight ? fromNode.x + width + 8 : fromNode.x - 8,
+        y: fromNode.y + height / 2
+      };
+      const end = {
+        x: goingRight ? toNode.x - 8 : toNode.x + width + 8,
+        y: toNode.y + height / 2
+      };
+      const bend = Math.max(36, Math.abs(end.x - start.x) * 0.42);
+      const c1 = goingRight ? start.x + bend : start.x - bend;
+      const c2 = goingRight ? end.x - bend : end.x + bend;
+      return `M ${start.x} ${start.y} C ${c1} ${start.y}, ${c2} ${end.y}, ${end.x} ${end.y}`;
+    }
+
+    function drawEdges() {
+      svgEl.querySelectorAll("path.edge").forEach((el) => el.remove());
+      for (const [from, to] of edges) {
+        const fromNode = nodeById.get(from);
+        const toNode = nodeById.get(to);
+        const isSameLayer = fromNode.layer === toNode.layer;
+        let d;
+        if (isSameLayer) {
+          d = sameLayerPath(from, to);
+        } else {
+          const start = pointFor(from, "out");
+          const end = pointFor(to, "in");
+          const midY = start.y + Math.max(32, (end.y - start.y) * 0.48);
+          d = `M ${start.x} ${start.y} C ${start.x} ${midY}, ${end.x} ${midY}, ${end.x} ${end.y - 7}`;
+        }
+        const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
+        path.setAttribute("d", d);
+        path.setAttribute("class", isSameLayer ? "edge is-same-layer" : "edge");
+        path.setAttribute("data-from", from);
+        path.setAttribute("data-to", to);
+        path.setAttribute("marker-end", "url(#arrow)");
+        svgEl.appendChild(path);
+      }
+    }
+
+    function walk(start, map) {
+      const seen = new Set();
+      const stack = [...map.get(start)];
+      while (stack.length) {
+        const id = stack.pop();
+        if (seen.has(id)) continue;
+        seen.add(id);
+        stack.push(...map.get(id));
+      }
+      return seen;
+    }
+
+    function buttonList(container, ids) {
+      container.innerHTML = "";
+      if (!ids.length) {
+        const li = document.createElement("li");
+        li.innerHTML = '<span class="pill">无</span>';
+        container.appendChild(li);
+        return;
+      }
+      for (const id of ids) {
+        const li = document.createElement("li");
+        const btn = document.createElement("button");
+        btn.type = "button";
+        btn.textContent = nodeById.get(id).name;
+        btn.addEventListener("click", () => selectNode(id));
+        li.appendChild(btn);
+        container.appendChild(li);
+      }
+    }
+
+    function selectNode(id) {
+      const prereq = walk(id, incoming);
+      const dependent = walk(id, outgoing);
+
+      document.querySelectorAll(".node").forEach((el) => {
+        const current = el.dataset.id;
+        el.classList.toggle("is-selected", current === id);
+        el.classList.toggle("is-prereq", prereq.has(current));
+        el.classList.toggle("is-dependent", dependent.has(current));
+        el.classList.toggle(
+          "is-dim",
+          current !== id && !prereq.has(current) && !dependent.has(current)
+        );
+      });
+
+      document.querySelectorAll(".edge").forEach((el) => {
+        const from = el.dataset.from;
+        const to = el.dataset.to;
+        const isPrereqEdge = prereq.has(from) && (prereq.has(to) || to === id);
+        const isDependentEdge = (from === id || dependent.has(from)) && dependent.has(to);
+        el.classList.toggle("is-prereq", isPrereqEdge);
+        el.classList.toggle("is-dependent", isDependentEdge);
+        el.classList.toggle("is-dim", !isPrereqEdge && !isDependentEdge);
+        if (isPrereqEdge) {
+          el.setAttribute("marker-end", "url(#arrowRed)");
+        } else if (isDependentEdge) {
+          el.setAttribute("marker-end", "url(#arrowBlue)");
+        } else {
+          el.setAttribute("marker-end", "url(#arrow)");
+        }
+      });
+
+      const node = nodeById.get(id);
+      detailTitle.textContent = node.name;
+      if (node.slogan) {
+        detailSlogan.textContent = node.slogan;
+        detailSlogan.hidden = false;
+      } else {
+        detailSlogan.textContent = "";
+        detailSlogan.hidden = true;
+      }
+      detailText.textContent = node.note;
+      if (node.useCase) {
+        useCaseText.textContent = node.useCase;
+        useCaseBox.hidden = false;
+      } else {
+        useCaseText.textContent = "";
+        useCaseBox.hidden = true;
+      }
+      if (node.keyPoints?.length) {
+        keyPointsList.innerHTML = "";
+        for (const point of node.keyPoints) {
+          const li = document.createElement("li");
+          li.textContent = point;
+          keyPointsList.appendChild(li);
+        }
+        keyPointsTitle.hidden = false;
+        keyPointsList.hidden = false;
+      } else {
+        keyPointsList.innerHTML = "";
+        keyPointsTitle.hidden = true;
+        keyPointsList.hidden = true;
+      }
+      detailMeta.innerHTML = "";
+      for (const tag of node.tags) {
+        const span = document.createElement("span");
+        span.className = "pill";
+        span.textContent = tag;
+        detailMeta.appendChild(span);
+      }
+
+      buttonList(prereqList, sortByTopology([...prereq]));
+      buttonList(dependentList, sortByTopology([...dependent]));
+    }
+
+    function topologicalOrder() {
+      const inDegree = new Map(nodes.map((node) => [node.id, incoming.get(node.id).length]));
+      const queue = nodes
+        .filter((node) => inDegree.get(node.id) === 0)
+        .sort((a, b) => a.layer - b.layer || a.x - b.x)
+        .map((node) => node.id);
+      const result = [];
+
+      while (queue.length) {
+        const id = queue.shift();
+        result.push(id);
+        for (const next of outgoing.get(id)) {
+          inDegree.set(next, inDegree.get(next) - 1);
+          if (inDegree.get(next) === 0) {
+            queue.push(next);
+            queue.sort((a, b) => {
+              const left = nodeById.get(a);
+              const right = nodeById.get(b);
+              return left.layer - right.layer || left.y - right.y || left.x - right.x;
+            });
+          }
+        }
+      }
+      return result;
+    }
+
+    const topo = topologicalOrder();
+
+    function sortByTopology(ids) {
+      return ids.sort((a, b) => topo.indexOf(a) - topo.indexOf(b));
+    }
+
+    function renderGuide() {
+      starterList.innerHTML = "";
+      starterIds.forEach((id, index) => {
+        const node = nodeById.get(id);
+        const li = document.createElement("li");
+        const btn = document.createElement("button");
+        btn.type = "button";
+        btn.textContent = `${index + 1}. ${node.name}`;
+        btn.addEventListener("click", () => selectNode(id));
+        li.appendChild(btn);
+        starterList.appendChild(li);
+      });
+
+      pathList.innerHTML = "";
+      interestPaths.forEach((path) => {
+        const li = document.createElement("li");
+        const btn = document.createElement("button");
+        btn.type = "button";
+        btn.textContent = path.label;
+        btn.addEventListener("click", () => showInterestPath(path.ids));
+        li.appendChild(btn);
+        pathList.appendChild(li);
+      });
+    }
+
+    function reset() {
+      document.querySelectorAll(".node").forEach((el) => {
+        el.classList.remove("is-selected", "is-prereq", "is-dependent", "is-dim", "is-starter");
+      });
+      document.querySelectorAll(".edge").forEach((el) => {
+        el.classList.remove("is-prereq", "is-dependent", "is-dim");
+        el.setAttribute("marker-end", "url(#arrow)");
+      });
+    }
+
+    function showOrderPath() {
+      restoreLabels();
+      reset();
+      document.querySelectorAll(".node").forEach((el) => {
+        const index = starterIds.indexOf(el.dataset.id);
+        if (index >= 0) {
+          el.classList.add("is-starter");
+          el.querySelector("span").textContent = `入口 ${index + 1}`;
+        } else {
+          el.classList.add("is-dim");
+        }
+      });
+      showStarterIntro();
+    }
+
+    function showStarterIntro() {
+      detailTitle.textContent = "五个入口";
+      detailSlogan.textContent = "";
+      detailSlogan.hidden = true;
+      detailText.textContent = "第一次看不要从整张图开始。先读发心、行动、体验、向上、共进；读顺以后，剩下的概念可以按兴趣自由进入。";
+      useCaseText.textContent = "";
+      useCaseBox.hidden = true;
+      keyPointsList.innerHTML = "";
+      keyPointsTitle.hidden = true;
+      keyPointsList.hidden = true;
+      detailMeta.innerHTML = "";
+      ["默认入口", "自由跳读"].forEach((tag) => {
+        const span = document.createElement("span");
+        span.className = "pill";
+        span.textContent = tag;
+        detailMeta.appendChild(span);
+      });
+      buttonList(prereqList, []);
+      buttonList(dependentList, starterIds);
+    }
+
+    function showInterestPath(ids) {
+      restoreLabels();
+      selectNode(ids[ids.length - 1]);
+      const idSet = new Set(ids);
+      document.querySelectorAll(".node").forEach((el) => {
+        const inPath = idSet.has(el.dataset.id);
+        el.classList.toggle("is-starter", inPath);
+        if (inPath) {
+          el.classList.remove("is-dim");
+        }
+      });
+      document.querySelectorAll(".edge").forEach((el) => {
+        const from = el.dataset.from;
+        const to = el.dataset.to;
+        const inPath = idSet.has(from) && idSet.has(to);
+        if (inPath) {
+          el.classList.remove("is-dim");
+          el.classList.add("is-dependent");
+          el.setAttribute("marker-end", "url(#arrowBlue)");
+        }
+      });
+    }
+
+    function restoreLabels() {
+      document.querySelectorAll(".node").forEach((el) => {
+        const node = nodeById.get(el.dataset.id);
+        el.querySelector("span").textContent = node.tags.slice(0, 2).join(" · ");
+      });
+    }
+
+    document.getElementById("showAll").addEventListener("click", () => {
+      restoreLabels();
+      reset();
+    });
+
+    document.getElementById("showOrder").addEventListener("click", showOrderPath);
+    document.getElementById("selectRoot").addEventListener("click", () => {
+      restoreLabels();
+      selectNode("heart");
+    });
+
+    nodes.forEach(makeNode);
+    drawEdges();
+    renderGuide();
+    showOrderPath();
+  </script>
+</body>
+</html>
