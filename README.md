@@ -17,6 +17,12 @@ permalink: /
 
 像素风休闲生活模拟器，五个场景，纯前端 Canvas。
 
+# 理论整理
+
+## <a href="/honghong-theory/" target="_blank" rel="noopener">▶ 进入 泓泓理论拓扑阅读图谱</a>
+
+从五个入口开始，按拓扑关系阅读泓泓理论。
+
 # 游戏开发
 
 ## <a href="https://github.com/JosephLE910/ai-gamedev-workflow" target="_blank" rel="noopener">🤖 AI 游戏开发协作蓝图</a>
